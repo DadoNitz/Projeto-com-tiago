@@ -14,13 +14,42 @@ import { softDeleteExtension } from "./soft-delete";
  * módulo — a regra é imposta pelo ESLint (ver eslint.config.mjs).
  */
 
+/**
+ * Tamanho do pool de conexões da aplicação.
+ *
+ * Pequeno de propósito. O padrão do `pg` é 10, e 10 é errado nos dois
+ * ambientes em que este sistema roda:
+ *
+ * - **Serverless**: cada instância de função abriria seu próprio pool. Com
+ *   algumas instâncias simultâneas, o limite de conexões do Neon estoura e as
+ *   requisições passam a falhar sob carga — exatamente quando não podem.
+ * - **Testes**: cada arquivo de teste cria um cliente novo. Foi o que
+ *   produziu falhas intermitentes na suíte completa, que sumiam ao rodar o
+ *   arquivo isolado.
+ *
+ * Quem faz o trabalho de multiplexar conexões é o pooler do Neon (PgBouncer),
+ * do outro lado. O pool local só precisa cobrir a concorrência de uma
+ * instância.
+ */
+function tamanhoDoPool(ambiente: string): number {
+  if (ambiente === "test") return 2;
+  if (ambiente === "production") return 5;
+  return 5;
+}
+
 function criarClient() {
   const { DATABASE_URL, NODE_ENV } = env();
   // A aplicacao usa a conexao pooled: e o certo para trafego normal.
   const url = normalizarUrlPostgres(DATABASE_URL);
 
   const adapter = new PrismaPg(
-    { connectionString: url },
+    {
+      connectionString: url,
+      max: tamanhoDoPool(NODE_ENV),
+      // Devolve a conexão ociosa em vez de segurá-la: numa função serverless
+      // que dorme entre requisições, conexão presa é conexão desperdiçada.
+      idleTimeoutMillis: 10_000,
+    },
     { schema: lerSchema(url) },
   );
 

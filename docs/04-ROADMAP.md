@@ -48,7 +48,11 @@
 
 Como o volume esperado é de fotos tiradas no celular durante o cadastro, e não em lote, a opção local tende a ser suficiente. A decisão fica registrada aqui para ser tomada quando a Fase 4 começar; o campo no banco já existe e não bloqueia nenhuma das duas.
 
-## FASE 1 — MVP (em execução)
+> **Estado atual:** todas as cinco fases têm implementação funcionando em
+> produção. O registro do que existe, do que ficou de fora e por quê está em
+> [05-ESTADO-ATUAL.md](05-ESTADO-ATUAL.md).
+
+## FASE 1 — MVP
 
 Ordem de implementação, cada etapa terminando com lint + typecheck + testes:
 
