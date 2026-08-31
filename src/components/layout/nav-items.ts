@@ -46,6 +46,19 @@ export const NAVEGACAO: ItemDeNavegacao[] = [
         disponivel: true,
       },
       {
+        titulo: "Ler QR Code",
+        href: "/estoque/ler",
+        icone: "ScanLine",
+        disponivel: true,
+      },
+      {
+        titulo: "Etiquetas e QR Code",
+        href: "/estoque/etiquetas",
+        icone: "QrCode",
+        permissao: "inventory:write",
+        disponivel: true,
+      },
+      {
         titulo: "Categorias e marcas",
         href: "/estoque/categorias",
         icone: "Tags",

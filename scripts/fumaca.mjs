@@ -124,6 +124,8 @@ const rotas = [
   "/montagens/minhas",
   "/estoque/novo",
   "/estoque/movimentacoes",
+  "/estoque/ler",
+  "/estoque/etiquetas",
   "/inteligencia",
   "/inteligencia/analise",
   "/mais",
