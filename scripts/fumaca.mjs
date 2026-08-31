@@ -121,6 +121,7 @@ const rotas = [
   "/estoque/itens?status=AVAILABLE&ordenacao=valor-maior",
   "/socios",
   "/montagens",
+  "/montagens/minhas",
   "/estoque/novo",
   "/mais",
   "/api/health",

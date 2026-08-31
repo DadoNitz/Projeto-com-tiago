@@ -2,7 +2,9 @@ import { AlertTriangle, Cpu, TriangleAlert } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { SalvarMontagem } from "@/components/inventory/salvar-montagem";
 import { ROTULO_NIVEL, type NivelCompatibilidade } from "@/domain/compatibility/types";
+import type { Componente } from "@/domain/compatibility/types";
 import { formatarMoeda, formatarNumero } from "@/lib/format";
 import { montarPainelDeSugestoes } from "@/server/services/build.service";
 import { cn } from "@/lib/utils";
@@ -33,14 +35,22 @@ export default async function MontagensPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-          Montar com meu estoque
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Combinações possíveis com as peças disponíveis agora. Cada sugestão
-          usa peças diferentes — todas podem ser montadas ao mesmo tempo.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+            Montar com meu estoque
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Combinações possíveis com as peças disponíveis agora. Cada sugestão
+            usa peças diferentes — todas podem ser montadas ao mesmo tempo.
+          </p>
+        </div>
+        <Link
+          href="/montagens/minhas"
+          className="text-muted-foreground hover:text-foreground text-sm underline"
+        >
+          Minhas montagens
+        </Link>
       </div>
 
       <section
@@ -129,14 +139,26 @@ export default async function MontagensPage() {
                   </p>
                 </div>
 
-                <div className="text-right">
-                  <p className="text-sm font-medium tabular-nums">
-                    {formatarMoeda(sugestao.valorDasPecas)}
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    {sugestao.totalDePecas} peças ·{" "}
-                    {sugestao.compatibilidade.consumoEstimadoW} W estimados
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-sm font-medium tabular-nums">
+                      {formatarMoeda(sugestao.valorDasPecas)}
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      {sugestao.totalDePecas} peças ·{" "}
+                      {sugestao.compatibilidade.consumoEstimadoW} W estimados
+                    </p>
+                  </div>
+                  <SalvarMontagem
+                    unitIds={idsDaMontagem(sugestao.montagem)}
+                    nomeSugerido={nomeDaMontagem(sugestao)}
+                    tier={sugestao.nivel}
+                    useCase={sugestao.usosRecomendados[0] ?? ""}
+                    valorSugerido={sugestao.valorDasPecas}
+                    incompativel={
+                      sugestao.compatibilidade.nivel === "INCOMPATIBLE"
+                    }
+                  />
                 </div>
               </header>
 
@@ -222,6 +244,42 @@ export default async function MontagensPage() {
       </p>
     </div>
   );
+}
+
+/** Ids das unidades que compoem a montagem, na ordem dos papeis. */
+function idsDaMontagem(montagem: {
+  cpu?: Componente | undefined;
+  motherboard?: Componente | undefined;
+  gpu?: Componente | undefined;
+  psu?: Componente | undefined;
+  case?: Componente | undefined;
+  cooler?: Componente | undefined;
+  ram: Componente[];
+  storage: Componente[];
+}): string[] {
+  return [
+    montagem.cpu,
+    montagem.motherboard,
+    montagem.gpu,
+    montagem.psu,
+    montagem.case,
+    montagem.cooler,
+    ...montagem.ram,
+    ...montagem.storage,
+  ]
+    .filter((peca): peca is Componente => Boolean(peca))
+    .map((peca) => peca.id);
+}
+
+/** Nome inicial da montagem: processador e placa de video dizem o essencial. */
+function nomeDaMontagem(sugestao: {
+  nivel: string;
+  montagem: { cpu?: Componente | undefined; gpu?: Componente | undefined };
+}): string {
+  const partes = [sugestao.nivel];
+  if (sugestao.montagem.cpu) partes.push(sugestao.montagem.cpu.nome);
+  if (sugestao.montagem.gpu) partes.push(sugestao.montagem.gpu.nome);
+  return partes.join(" · ");
 }
 
 function Papel({
