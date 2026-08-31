@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { GerarAnuncio } from "@/components/inventory/gerar-anuncio";
 import { MovimentarUnidade } from "@/components/inventory/movimentar";
 import { Icone } from "@/components/layout/icon";
 import { ConditionBadge, StatusBadge } from "@/components/shared/status-badge";
@@ -12,6 +13,7 @@ import {
   MOVIMENTO_DE_SAIDA,
   ROTULO_MOVIMENTO,
 } from "@/lib/inventory-labels";
+import { iaDisponivel } from "@/lib/ai";
 import { can } from "@/lib/auth/permissions";
 import { caminhoDoLocal, listarLocais } from "@/server/services/catalog.service";
 import { NaoEncontradoError } from "@/server/services/errors";
@@ -61,6 +63,9 @@ export default async function UnidadePage({
   const [locais, ctx] = await Promise.all([listarLocais(), requireContext()]);
   const caminho = caminhoDoLocal(locais, unidade.locationId);
   const podeMovimentar = can(ctx.role, "movement:create");
+  // O botao so aparece quando ha chave configurada: oferecer o que vai falhar
+  // ao clicar e pior do que nao oferecer.
+  const podeAnunciar = can(ctx.role, "ai:use") && iaDisponivel();
 
   const specs = Object.entries(
     (unidade.product.specs ?? {}) as Record<string, unknown>,
@@ -104,19 +109,31 @@ export default async function UnidadePage({
           </div>
         </div>
 
-        {podeMovimentar ? (
-          <div className="mt-4 border-t pt-4">
-            <MovimentarUnidade
-              unitId={unidade.id}
-              statusAtual={unidade.status}
-              nomeDaPeca={`${unidade.product.name} (${unidade.internalCode})`}
-              porQuantidade={unidade.product.trackingMode === "QUANTITY"}
-              saldoAtual={unidade.quantity}
-              locais={locais.map((local) => ({
-                id: local.id,
-                name: local.name,
-              }))}
-            />
+        {podeMovimentar || podeAnunciar ? (
+          <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
+            {podeAnunciar ? (
+              <GerarAnuncio
+                unitId={unidade.id}
+                precoSugerido={
+                  unidade.estimatedSalePrice
+                    ? Number(unidade.estimatedSalePrice)
+                    : undefined
+                }
+              />
+            ) : null}
+            {podeMovimentar ? (
+              <MovimentarUnidade
+                unitId={unidade.id}
+                statusAtual={unidade.status}
+                nomeDaPeca={`${unidade.product.name} (${unidade.internalCode})`}
+                porQuantidade={unidade.product.trackingMode === "QUANTITY"}
+                saldoAtual={unidade.quantity}
+                locais={locais.map((local) => ({
+                  id: local.id,
+                  name: local.name,
+                }))}
+              />
+            ) : null}
           </div>
         ) : null}
       </header>

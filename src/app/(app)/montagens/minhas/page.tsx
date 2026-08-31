@@ -4,8 +4,13 @@ import Link from "next/link";
 
 import type { BuildStatus } from "@/generated/prisma/enums";
 import { formatarData, formatarMoeda, paraNumero } from "@/lib/format";
+import { iaDisponivel } from "@/lib/ai";
+import { can } from "@/lib/auth/permissions";
 import { listarMontagens } from "@/server/services/build-write.service";
+import { requireContext } from "@/server/session";
 import { cn } from "@/lib/utils";
+
+import { GerarAnuncio } from "@/components/inventory/gerar-anuncio";
 
 import { CancelarMontagem, VenderMontagem } from "./acoes";
 
@@ -36,7 +41,11 @@ const COR_STATUS: Record<BuildStatus, string> = {
 const SEGURA_PECAS: BuildStatus[] = ["PLANNED", "RESERVED", "ASSEMBLING", "ASSEMBLED"];
 
 export default async function MinhasMontagensPage() {
-  const montagens = await listarMontagens();
+  const [montagens, ctx] = await Promise.all([
+    listarMontagens(),
+    requireContext(),
+  ]);
+  const podeAnunciar = can(ctx.role, "ai:use") && iaDisponivel();
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
@@ -130,6 +139,12 @@ export default async function MinhasMontagensPage() {
                       buildId={montagem.id}
                       totalDePecas={montagem._count.items}
                     />
+                    {podeAnunciar ? (
+                      <GerarAnuncio
+                        buildId={montagem.id}
+                        precoSugerido={venda ?? undefined}
+                      />
+                    ) : null}
                   </div>
                 ) : null}
               </li>
