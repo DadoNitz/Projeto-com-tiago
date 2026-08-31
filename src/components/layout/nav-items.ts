@@ -125,8 +125,7 @@ export const NAVEGACAO: ItemDeNavegacao[] = [
     titulo: "Promoções",
     href: "/promocoes",
     icone: "Tag",
-    disponivel: false,
-    fase: "Fase 5",
+    disponivel: true,
   },
   {
     titulo: "Configurações",
