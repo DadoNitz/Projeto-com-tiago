@@ -1,0 +1,826 @@
+// Schema do "ERP inteligente para estoque e montagem de hardware".
+//
+// Cobre todas as fases do roadmap. Modelos de fases futuras (IA, promoções)
+// existem desde já porque criar tabela isolada depois é barato, mas alterar
+// tabelas centrais com dados reais dentro não é.
+//
+// Conceito central: Product (o modelo da peça) x InventoryUnit (a unidade
+// física). Especificação técnica mora no Product e nunca é repetida por unidade.
+// Ver docs/02-MODELAGEM.md.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Usuários e acesso
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN // controle total
+  EMPLOYEE // cadastro, movimentações e consultas
+  VIEWER // apenas visualização
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         Role      @default(VIEWER)
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  movements     InventoryMovement[]
+  auditLogs     AuditLog[]
+  builds        Build[]
+  conversations AIConversation[]
+  verifiedOverrides CompatibilityOverride[]
+  partner       Partner?
+
+  @@index([deletedAt])
+  @@map("users")
+}
+
+/// Quem coloca dinheiro na operacao: socio, comprador, investidor.
+///
+/// Separado de `User` de proposito. Quem financia uma peca nao precisa ter
+/// acesso ao sistema, e quem opera o sistema nao necessariamente investe
+/// dinheiro. Amarrar os dois obrigaria a criar login para um socio que so quer
+/// saber quanto ja gastou e quanto voltou.
+///
+/// O vinculo opcional com `User` cobre o caso de o socio tambem operar.
+model Partner {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  name      String
+  email     String?
+  phone     String?
+  notes     String?
+  active    Boolean   @default(true)
+  /// Preenchido quando o socio tambem tem login no sistema.
+  userId    String?   @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user           User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  purchasedUnits InventoryUnit[]
+  movements      InventoryMovement[]
+
+  @@index([deletedAt])
+  @@map("partners")
+}
+
+// ---------------------------------------------------------------------------
+// Catálogo: categorias, marcas, definições de especificação
+// ---------------------------------------------------------------------------
+
+model Category {
+  id          String    @id @default(cuid())
+  // slug é o contrato entre o catálogo e o motor de compatibilidade
+  // (cpu, motherboard, ram, gpu, psu, case, storage, cooler, ...)
+  slug        String    @unique
+  name        String
+  description String?
+  icon        String?
+  parentId    String?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  parent          Category?        @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children        Category[]       @relation("CategoryTree")
+  products        Product[]
+  specDefinitions SpecDefinition[]
+
+  @@index([parentId])
+  @@index([deletedAt])
+  @@map("categories")
+}
+
+model Brand {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  name      String
+  website   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  products Product[]
+
+  @@index([deletedAt])
+  @@map("brands")
+}
+
+enum SpecType {
+  STRING
+  NUMBER
+  BOOLEAN
+  ENUM
+  /// Multiplos valores de um vocabulario controlado.
+  /// Necessario para specs genuinamente multivaloradas: um cooler suporta
+  /// AM4, AM5 e LGA1700 ao mesmo tempo; uma fonte tem varios conectores.
+  MULTI_ENUM
+}
+
+/// Catálogo que descreve quais especificações existem em cada categoria.
+/// É a fonte do formulário dinâmico de cadastro e da validação Zod em runtime.
+/// Adicionar uma categoria nova = inserir linhas aqui, sem migration.
+model SpecDefinition {
+  id         String   @id @default(cuid())
+  categoryId String
+  /// chave usada dentro de Product.specs (ex.: "socket", "vramGb")
+  key        String
+  label      String
+  type       SpecType
+  /// unidade exibida na UI (ex.: "GB", "MHz", "W", "mm")
+  unit       String?
+  required   Boolean  @default(false)
+  /// valores aceitos quando type = ENUM. Vocabulário controlado: é o que
+  /// impede "AM4" / "am4" / "Socket AM4" de virarem três valores distintos.
+  options    String[] @default([])
+  /// quando true, esta spec é lida pelo motor de compatibilidade e por isso
+  /// deve ser ENUM ou NUMBER — nunca texto livre.
+  usedInCompatibility Boolean @default(false)
+  helpText   String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, key])
+  @@index([categoryId, sortOrder])
+  @@map("spec_definitions")
+}
+
+// ---------------------------------------------------------------------------
+// Product: o MODELO da peça. Aqui moram as especificações técnicas.
+// ---------------------------------------------------------------------------
+
+enum TrackingMode {
+  /// cada unidade física é uma linha em InventoryUnit (quantity sempre 1)
+  SERIALIZED
+  /// controle por saldo agregado: uma linha com quantity > 1
+  QUANTITY
+}
+
+model Product {
+  id          String       @id @default(cuid())
+  name        String
+  model       String?
+  partNumber  String?
+  categoryId  String
+  brandId     String?
+  trackingMode TrackingMode @default(SERIALIZED)
+
+  /// Especificações técnicas validadas contra SpecDefinition da categoria.
+  /// JSONB + índice GIN: flexível como EAV, consultável como coluna.
+  specs Json @default("{}")
+
+  description        String?
+  defaultSalePrice   Decimal? @db.Decimal(12, 2)
+  /// dispara o alerta de "estoque baixo" do dashboard
+  lowStockThreshold  Int      @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  category    Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  brand       Brand?          @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  images      ProductImage[]
+  units       InventoryUnit[]
+  tags        ProductTag[]
+  movements   InventoryMovement[]
+  promotions  Promotion[]
+
+  @@index([categoryId, deletedAt])
+  @@index([brandId, deletedAt])
+  @@index([deletedAt])
+  @@index([specs(ops: JsonbPathOps)], type: Gin)
+  @@map("products")
+}
+
+model ProductImage {
+  id           String   @id @default(cuid())
+  productId    String
+  /// chave no StorageProvider (não é URL: o driver pode mudar)
+  storageKey   String
+  thumbnailKey String?
+  /// Versao com o fundo removido, quando gerada. Guardada ao lado da original,
+  /// nunca no lugar dela: a remocao de fundo erra em pecas escuras sobre mesa
+  /// escura, e o operador precisa poder voltar atras.
+  cutoutKey    String?
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  width        Int?
+  height       Int?
+  isPrimary    Boolean  @default(false)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+  @@map("product_images")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+
+  products ProductTag[]
+
+  @@map("tags")
+}
+
+model ProductTag {
+  productId String
+  tagId     String
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@index([tagId])
+  @@map("product_tags")
+}
+
+// ---------------------------------------------------------------------------
+// InventoryUnit: a UNIDADE FÍSICA. Só o que é individual mora aqui.
+// ---------------------------------------------------------------------------
+
+/// Estado físico da peça. Muda pouco.
+enum UnitCondition {
+  NEW
+  LIKE_NEW
+  USED
+  DEFECTIVE
+  FOR_TESTING
+}
+
+/// Situação operacional/comercial. Muda a cada movimentação.
+/// Separado de UnitCondition para permitir "peça usada que está reservada".
+enum UnitStatus {
+  AVAILABLE
+  RESERVED
+  IN_BUILD
+  SOLD
+  DEFECTIVE
+  DISCARDED
+  IN_TRANSIT
+}
+
+model Location {
+  id        String    @id @default(cuid())
+  name      String
+  code      String?   @unique
+  parentId  String?
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  parent   Location?       @relation("LocationTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children Location[]      @relation("LocationTree")
+  units    InventoryUnit[]
+
+  movementsFrom InventoryMovement[] @relation("MovementFromLocation")
+  movementsTo   InventoryMovement[] @relation("MovementToLocation")
+
+  @@index([parentId])
+  @@index([deletedAt])
+  @@map("locations")
+}
+
+model InventoryUnit {
+  id        String @id @default(cuid())
+  productId String
+
+  /// código interno único; é o conteúdo do QR Code da etiqueta (INV-<code>)
+  internalCode String  @unique
+  serialNumber String?
+  /// últimos caracteres do serial, em coluna própria e indexada — permite
+  /// buscar "7812" sem varredura com LIKE '%...'
+  serialLast   String?
+
+  condition UnitCondition @default(USED)
+  status    UnitStatus    @default(AVAILABLE)
+
+  locationId String?
+  /// sempre 1 quando o produto é SERIALIZED (CHECK constraint na migration)
+  quantity   Int    @default(1)
+
+  purchaseCost        Decimal?  @db.Decimal(12, 2)
+  estimatedSalePrice  Decimal?  @db.Decimal(12, 2)
+  purchaseDate        DateTime?
+  entryDate           DateTime  @default(now())
+  /// procedência: fornecedor, sucata, troca, cliente...
+  origin              String?
+  notes               String?
+
+  /// Quem pagou por esta peça. É o que responde "quanto o Eduardo já gastou".
+  /// Um comprador por unidade: quando duas pessoas dividem uma compra, a
+  /// divisão é registrada como valores separados no histórico de movimentação,
+  /// que aceita vários lançamentos por unidade.
+  purchasedById String?
+
+  /// Preenchidos na venda. Guardados na própria unidade, e não só no
+  /// histórico, porque "por quanto isto foi vendido" é uma pergunta constante
+  /// e não deve exigir varrer movimentações.
+  soldPrice  Decimal?  @db.Decimal(12, 2)
+  soldAt     DateTime?
+  soldToName String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  product     Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
+  location    Location?           @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  purchasedBy Partner?            @relation(fields: [purchasedById], references: [id], onDelete: SetNull)
+  images      UnitImage[]
+  movements   InventoryMovement[]
+  buildItems  BuildItem[]
+  listings    Listing[]
+
+  @@index([productId, status])
+  @@index([status, deletedAt])
+  @@index([locationId, status])
+  @@index([serialLast])
+  @@index([purchasedById, deletedAt])
+  @@index([deletedAt])
+  @@map("inventory_units")
+}
+
+/// Foto da unidade física (estado real, avaria, etiqueta) — diferente da
+/// foto de catálogo do modelo.
+model UnitImage {
+  id           String   @id @default(cuid())
+  unitId       String
+  storageKey   String
+  thumbnailKey String?
+  /// Versao com o fundo removido, quando gerada. Ver ProductImage.cutoutKey.
+  cutoutKey    String?
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  width        Int?
+  height       Int?
+  /// marca fotos de etiqueta, alvo do OCR na Fase 4
+  isLabel      Boolean  @default(false)
+  isPrimary    Boolean  @default(false)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  unit InventoryUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId, sortOrder])
+  @@map("unit_images")
+}
+
+// ---------------------------------------------------------------------------
+// Movimentações — append-only. Nunca editadas, nunca removidas.
+// ---------------------------------------------------------------------------
+
+enum MovementType {
+  INBOUND // entrada
+  OUTBOUND // saída
+  SALE // venda
+  RESERVE // reserva
+  UNRESERVE // cancelamento de reserva
+  RETURN // devolução / retorno ao estoque
+  DEFECT // marcado como defeituoso
+  DISCARD // descarte
+  BUILD_ALLOCATE // uso em montagem
+  BUILD_RELEASE // liberado de uma montagem cancelada
+  TRANSFER // mudança de localização
+  ADJUSTMENT // ajuste manual
+}
+
+model InventoryMovement {
+  id        String       @id @default(cuid())
+  unitId    String
+  productId String
+  type      MovementType
+  quantity  Int          @default(1)
+
+  /// guardar origem e destino permite reconstruir o estoque em qualquer data
+  fromStatus     UnitStatus?
+  toStatus       UnitStatus?
+  fromLocationId String?
+  toLocationId   String?
+
+  userId String?
+  reason String?
+  notes  String?
+
+  buildId String?
+
+  /// Valor financeiro do lançamento: o que saiu numa compra, o que entrou numa
+  /// venda. Fica no histórico, que é append-only, para que o extrato por
+  /// sócio seja reconstituível e não dependa de campos mutáveis.
+  amount Decimal? @db.Decimal(12, 2)
+
+  /// De quem saiu ou para quem foi o dinheiro deste lançamento.
+  /// É o que permite dividir uma compra entre sócios: dois lançamentos na
+  /// mesma unidade, com valores e sócios diferentes.
+  partnerId String?
+
+  createdAt DateTime @default(now())
+
+  unit         InventoryUnit @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  product      Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  partner      Partner?      @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  build        Build?        @relation(fields: [buildId], references: [id], onDelete: SetNull)
+  fromLocation Location?     @relation("MovementFromLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
+  toLocation   Location?     @relation("MovementToLocation", fields: [toLocationId], references: [id], onDelete: SetNull)
+
+  @@index([unitId, createdAt])
+  @@index([productId, createdAt])
+  @@index([type, createdAt])
+  @@index([partnerId, createdAt])
+  @@index([createdAt])
+  @@map("inventory_movements")
+}
+
+// ---------------------------------------------------------------------------
+// Montagens (Fase 2)
+// ---------------------------------------------------------------------------
+
+enum BuildStatus {
+  PLANNED
+  RESERVED
+  ASSEMBLING
+  ASSEMBLED
+  SOLD
+  CANCELLED
+}
+
+/// Papel da peça dentro da montagem. Alinhado aos slugs de Category.
+enum BuildRole {
+  CPU
+  MOTHERBOARD
+  RAM
+  GPU
+  STORAGE
+  PSU
+  CASE
+  COOLER
+  MONITOR
+  PERIPHERAL
+  OTHER
+}
+
+model Build {
+  id           String      @id @default(cuid())
+  name         String
+  customerName String?
+  status       BuildStatus @default(PLANNED)
+
+  totalCost Decimal? @db.Decimal(12, 2)
+  salePrice Decimal? @db.Decimal(12, 2)
+
+  /// resultado completo do CompatibilityEngine no momento da confirmação
+  compatibility Json?
+  useCase       String?
+  tier          String?
+  notes         String?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  createdBy User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  items     BuildItem[]
+  movements InventoryMovement[]
+  listings  Listing[]
+
+  @@index([status, deletedAt])
+  @@index([deletedAt])
+  @@map("builds")
+}
+
+model BuildItem {
+  id       String    @id @default(cuid())
+  buildId  String
+  unitId   String
+  role     BuildRole
+  quantity Int       @default(1)
+  notes    String?
+
+  createdAt DateTime @default(now())
+
+  build Build         @relation(fields: [buildId], references: [id], onDelete: Cascade)
+  unit  InventoryUnit @relation(fields: [unitId], references: [id], onDelete: Restrict)
+
+  @@unique([buildId, unitId])
+  @@index([unitId])
+  @@map("build_items")
+}
+
+enum CompatibilityLevel {
+  COMPATIBLE
+  LIKELY_COMPATIBLE
+  NEEDS_VERIFICATION
+  INCOMPATIBLE
+}
+
+/// Sugestão gerada pelo motor determinístico e narrada pela IA.
+/// Persistida para não recalcular e para dar histórico das recomendações.
+model BuildSuggestion {
+  id            String             @id @default(cuid())
+  title         String
+  /// unidades sugeridas, por papel
+  components    Json
+  missingParts  Json               @default("[]")
+  /// resultado íntegro do CompatibilityEngine (checks, avisos, veredito)
+  compatibility Json
+  level         CompatibilityLevel
+  score         Int                @default(0)
+  tier          String?
+  useCase       String?
+  estimatedWatts Int?
+  recommendedPsuWatts Int?
+  estimatedValue Decimal?          @db.Decimal(12, 2)
+  /// texto gerado pela IA a partir do veredito já calculado
+  aiNarrative   String?
+  dismissed     Boolean            @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([dismissed, score])
+  @@map("build_suggestions")
+}
+
+/// Exceção manual verificada por um humano.
+/// Ex.: "esta B450 específica já está com a BIOS atualizada para Ryzen 5000".
+model CompatibilityOverride {
+  id           String   @id @default(cuid())
+  ruleKey      String
+  subjectType  String
+  subjectId    String
+  targetType   String?
+  targetId     String?
+  level        CompatibilityLevel
+  reason       String
+  verifiedById String?
+  verifiedAt   DateTime @default(now())
+
+  verifiedBy User? @relation(fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  @@index([ruleKey, subjectId])
+  @@map("compatibility_overrides")
+}
+
+// ---------------------------------------------------------------------------
+// IA (Fase 3)
+// ---------------------------------------------------------------------------
+
+model AIConversation {
+  id        String    @id @default(cuid())
+  userId    String?
+  title     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user     User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages AIMessage[]
+
+  @@index([userId, updatedAt])
+  @@map("ai_conversations")
+}
+
+model AIMessage {
+  id             String @id @default(cuid())
+  conversationId String
+  role           String // user | assistant | tool
+  content        String
+
+  /// quais tools a IA chamou e o que elas retornaram — permite auditar depois
+  /// se uma recomendação veio de dados reais do banco
+  toolCalls Json?
+
+  provider  String?
+  model     String?
+  tokensIn  Int?
+  tokensOut Int?
+
+  createdAt DateTime @default(now())
+
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("ai_messages")
+}
+
+enum AIAnalysisType {
+  STOCK_SUMMARY
+  STOCK_DIAGNOSIS
+  BOTTLENECKS
+  OPPORTUNITIES
+  PURCHASE_RECOMMENDATION
+  SALE_RECOMMENDATION
+  BUILD_POTENTIAL
+}
+
+model AIAnalysis {
+  id          String         @id @default(cuid())
+  type        AIAnalysisType
+  periodStart DateTime?
+  periodEnd   DateTime?
+  /// dados estruturados que alimentaram a análise (fatos, não texto)
+  input       Json
+  /// saída estruturada + narrativa
+  result      Json
+  narrative   String?
+  provider    String?
+  model       String?
+  generatedAt DateTime       @default(now())
+
+  @@index([type, generatedAt])
+  @@map("ai_analyses")
+}
+
+// ---------------------------------------------------------------------------
+// Anuncios de venda (Fase 3)
+// ---------------------------------------------------------------------------
+
+enum ListingChannel {
+  FACEBOOK_MARKETPLACE
+  OLX
+  MERCADO_LIVRE
+  WHATSAPP
+  INSTAGRAM
+  OUTRO
+}
+
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+  SOLD
+  ARCHIVED
+}
+
+/// Anuncio de venda de uma unidade ou de uma montagem.
+///
+/// Existe como entidade propria, e nao como um campo de texto na unidade, por
+/// tres motivos praticos:
+///
+/// 1. o mesmo computador costuma ser anunciado em mais de um canal, e cada um
+///    tem tom e limite de caracteres diferentes;
+/// 2. o texto e reescrito varias vezes ate vender, e o historico ajuda a saber
+///    qual versao funcionou;
+/// 3. a descricao gerada por IA precisa registrar de onde veio, para que uma
+///    especificacao errada no anuncio possa ser rastreada ate a peca.
+model Listing {
+  id      String  @id @default(cuid())
+  unitId  String?
+  buildId String?
+
+  channel ListingChannel @default(FACEBOOK_MARKETPLACE)
+  status  ListingStatus  @default(DRAFT)
+
+  title       String
+  description String
+  price       Decimal? @db.Decimal(12, 2)
+  /// Texto curto para compartilhar no WhatsApp, quando o canal exigir.
+  shortText   String?
+
+  /// Fotos escolhidas para o anuncio, na ordem. Guardadas como chaves do
+  /// storage: a selecao para venda quase nunca e a mesma do cadastro.
+  imageKeys String[] @default([])
+
+  generatedByAI Boolean @default(false)
+  aiProvider    String?
+  aiModel       String?
+  /// Instrucao usada na geracao, para reproduzir ou ajustar depois.
+  aiPrompt      String?
+
+  publishedAt DateTime?
+  externalUrl String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  unit  InventoryUnit? @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  build Build?         @relation(fields: [buildId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@index([buildId])
+  @@index([status, channel])
+  @@index([deletedAt])
+  @@map("listings")
+}
+
+// ---------------------------------------------------------------------------
+// Auditoria (Fase 1)
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id       String  @id @default(cuid())
+  userId   String?
+  action   String // create | update | delete | restore | movement | login ...
+  entity   String // Product | InventoryUnit | Build ...
+  entityId String
+
+  before Json?
+  after  Json?
+
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId, createdAt])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Promoções (Fase 5) — apenas o schema, sem implementação
+// ---------------------------------------------------------------------------
+
+model PromotionStore {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  website   String?
+  createdAt DateTime @default(now())
+
+  promotions Promotion[]
+
+  @@map("promotion_stores")
+}
+
+model Promotion {
+  id        String  @id @default(cuid())
+  storeId   String?
+  productId String?
+
+  title         String
+  categorySlug  String?
+  currentPrice  Decimal  @db.Decimal(12, 2)
+  regularPrice  Decimal? @db.Decimal(12, 2)
+  discountPct   Decimal? @db.Decimal(5, 2)
+  url           String?
+  coupon        String?
+  cashbackPct   Decimal? @db.Decimal(5, 2)
+  shippingCost  Decimal? @db.Decimal(12, 2)
+
+  /// avaliação da IA sobre a oferta valer a pena (Fase 5)
+  aiScore     Int?
+  aiVerdict   String?
+
+  seenAt    DateTime  @default(now())
+  expiresAt DateTime?
+  active    Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store        PromotionStore? @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  product      Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  priceHistory PriceHistory[]
+
+  @@index([active, seenAt])
+  @@index([categorySlug, active])
+  @@map("promotions")
+}
+
+model PriceHistory {
+  id          String   @id @default(cuid())
+  promotionId String?
+  productId   String?
+  storeSlug   String?
+  price       Decimal  @db.Decimal(12, 2)
+  recordedAt  DateTime @default(now())
+
+  promotion Promotion? @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+
+  @@index([productId, recordedAt])
+  @@index([promotionId, recordedAt])
+  @@map("price_history")
+}
