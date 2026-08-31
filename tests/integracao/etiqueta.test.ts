@@ -11,7 +11,17 @@ import { lerEtiqueta } from "@/server/services/label-reader.service";
  * maquina sem credencial. Quando ha, faz uma chamada real: mock aqui nao
  * provaria nada sobre a integracao, que e justamente o que pode quebrar.
  */
-const temChave = Boolean(process.env.GEMINI_API_KEY);
+/**
+ * Testes que chamam o modelo de verdade sao opt-in.
+ *
+ * Cada execucao consome cota do plano gratuito, que e por minuto e por dia.
+ * Rodar a suite inteira algumas vezes seguidas esgota o limite e passa a
+ * falhar por 429 — uma falha que nao diz nada sobre o codigo.
+ *
+ * Rodar com:  TESTAR_IA=1 npm test
+ */
+const temChave =
+  Boolean(process.env.GEMINI_API_KEY) && process.env.TESTAR_IA === "1";
 
 function etiquetaDeMemoria(): Promise<Buffer> {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="360">

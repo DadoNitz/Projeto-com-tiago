@@ -124,6 +124,7 @@ const rotas = [
   "/montagens/minhas",
   "/estoque/novo",
   "/estoque/movimentacoes",
+  "/inteligencia",
   "/mais",
   "/api/health",
 ];

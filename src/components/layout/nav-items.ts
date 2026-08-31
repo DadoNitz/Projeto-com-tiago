@@ -85,8 +85,22 @@ export const NAVEGACAO: ItemDeNavegacao[] = [
     href: "/inteligencia",
     icone: "Sparkles",
     permissao: "ai:use",
-    disponivel: false,
-    fase: "Fase 3",
+    disponivel: true,
+    filhos: [
+      {
+        titulo: "Perguntar à IA",
+        href: "/inteligencia",
+        icone: "Sparkles",
+        disponivel: true,
+      },
+      {
+        titulo: "Análise do estoque",
+        href: "/inteligencia/analise",
+        icone: "FileBarChart",
+        disponivel: false,
+        fase: "em construção",
+      },
+    ],
   },
   {
     titulo: "Relatórios",

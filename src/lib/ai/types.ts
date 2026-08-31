@@ -9,6 +9,8 @@
  * e é exatamente o acoplamento que a especificação manda evitar.
  */
 
+import type { ChamadaDeFerramenta, DefinicaoDeFerramenta } from "./tool-types";
+
 export interface MensagemDeTexto {
   papel: "user" | "assistant" | "system";
   texto: string;
@@ -39,10 +41,29 @@ export interface PedidoDeGeracao {
    */
   temperatura?: number;
   maxTokens?: number;
+  /**
+   * Ferramentas que o modelo pode chamar.
+   *
+   * O provedor apenas transporta: ele traduz a definicao para o formato do
+   * fornecedor e devolve as chamadas pedidas. Quem executa e a camada de
+   * servico — o provedor nunca toca no banco.
+   */
+  ferramentas?: readonly DefinicaoDeFerramenta[];
+  /**
+   * Historico bruto da conversa no formato do provedor.
+   *
+   * Necessario no loop de ferramentas: o modelo precisa ver a propria chamada
+   * e o resultado dela para formular a resposta final.
+   */
+  historicoBruto?: unknown[];
 }
 
 export interface RespostaDaIA {
   texto: string;
+  /** Ferramentas que o modelo pediu para executar antes de responder. */
+  chamadas?: ChamadaDeFerramenta[];
+  /** Historico atualizado, para a proxima volta do loop de ferramentas. */
+  historicoBruto?: unknown[];
   provider: string;
   modelo: string;
   tokensEntrada?: number | undefined;
