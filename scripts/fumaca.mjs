@@ -128,6 +128,8 @@ const rotas = [
   "/estoque/etiquetas",
   "/inteligencia",
   "/inteligencia/analise",
+  "/relatorios",
+  "/relatorios?periodo=ano",
   "/mais",
   "/api/health",
 ];

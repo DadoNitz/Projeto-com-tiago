@@ -119,8 +119,7 @@ export const NAVEGACAO: ItemDeNavegacao[] = [
     href: "/relatorios",
     icone: "FileBarChart",
     permissao: "report:read",
-    disponivel: false,
-    fase: "Fase 3",
+    disponivel: true,
   },
   {
     titulo: "Promoções",
