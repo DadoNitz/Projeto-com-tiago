@@ -84,6 +84,38 @@ export function caminhoDoLocal(
 }
 
 /**
+ * Marcas com a contagem de produtos que as usam.
+ *
+ * A contagem existe para a tela de configurações poder avisar antes de excluir:
+ * marca em uso por produtos não deve sumir sem que a pessoa saiba disso.
+ */
+export async function listarMarcasComUso() {
+  return prisma.brand.findMany({
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      website: true,
+      _count: { select: { products: true } },
+    },
+  });
+}
+
+/** Sócios com quantas peças cada um comprou. */
+export async function listarSociosComUso() {
+  return prisma.partner.findMany({
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      active: true,
+      _count: { select: { purchasedUnits: true } },
+    },
+  });
+}
+
+/**
  * Definições de especificação de uma categoria, no formato do domínio.
  *
  * É esta função que liga o catálogo em banco à validação e ao formulário

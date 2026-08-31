@@ -59,11 +59,11 @@ export const NAVEGACAO: ItemDeNavegacao[] = [
         disponivel: true,
       },
       {
-        titulo: "Categorias e marcas",
-        href: "/estoque/categorias",
+        titulo: "Marcas, locais e sócios",
+        href: "/configuracoes",
         icone: "Tags",
-        disponivel: false,
-        fase: "em construção",
+        permissao: "catalog:write",
+        disponivel: true,
       },
     ],
   },
@@ -132,8 +132,8 @@ export const NAVEGACAO: ItemDeNavegacao[] = [
     titulo: "Configurações",
     href: "/configuracoes",
     icone: "Settings",
-    disponivel: false,
-    fase: "em construção",
+    permissao: "catalog:write",
+    disponivel: true,
   },
 ];
 
