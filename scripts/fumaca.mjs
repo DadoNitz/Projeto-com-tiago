@@ -123,6 +123,7 @@ const rotas = [
   "/montagens",
   "/montagens/minhas",
   "/estoque/novo",
+  "/estoque/movimentacoes",
   "/mais",
   "/api/health",
 ];

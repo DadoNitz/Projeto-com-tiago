@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { MovimentarUnidade } from "@/components/inventory/movimentar";
 import { Icone } from "@/components/layout/icon";
 import { ConditionBadge, StatusBadge } from "@/components/shared/status-badge";
 import { conteudoQrCode } from "@/domain/inventory/serial";
@@ -11,9 +12,11 @@ import {
   MOVIMENTO_DE_SAIDA,
   ROTULO_MOVIMENTO,
 } from "@/lib/inventory-labels";
+import { can } from "@/lib/auth/permissions";
 import { caminhoDoLocal, listarLocais } from "@/server/services/catalog.service";
 import { NaoEncontradoError } from "@/server/services/errors";
 import { buscarUnidade } from "@/server/services/inventory.service";
+import { requireContext } from "@/server/session";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -55,8 +58,9 @@ export default async function UnidadePage({
     throw erro;
   }
 
-  const locais = await listarLocais();
+  const [locais, ctx] = await Promise.all([listarLocais(), requireContext()]);
   const caminho = caminhoDoLocal(locais, unidade.locationId);
+  const podeMovimentar = can(ctx.role, "movement:create");
 
   const specs = Object.entries(
     (unidade.product.specs ?? {}) as Record<string, unknown>,
@@ -99,6 +103,22 @@ export default async function UnidadePage({
             </div>
           </div>
         </div>
+
+        {podeMovimentar ? (
+          <div className="mt-4 border-t pt-4">
+            <MovimentarUnidade
+              unitId={unidade.id}
+              statusAtual={unidade.status}
+              nomeDaPeca={`${unidade.product.name} (${unidade.internalCode})`}
+              porQuantidade={unidade.product.trackingMode === "QUANTITY"}
+              saldoAtual={unidade.quantity}
+              locais={locais.map((local) => ({
+                id: local.id,
+                name: local.name,
+              }))}
+            />
+          </div>
+        ) : null}
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">
