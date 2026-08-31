@@ -66,8 +66,22 @@ export const NAVEGACAO: ItemDeNavegacao[] = [
     titulo: "Montagens",
     href: "/montagens",
     icone: "Cpu",
-    disponivel: false,
-    fase: "Fase 2",
+    disponivel: true,
+    filhos: [
+      {
+        titulo: "Montar com meu estoque",
+        href: "/montagens",
+        icone: "Cpu",
+        disponivel: true,
+      },
+      {
+        titulo: "Minhas montagens",
+        href: "/montagens/minhas",
+        icone: "List",
+        disponivel: false,
+        fase: "em construção",
+      },
+    ],
   },
   {
     titulo: "Inteligência",
