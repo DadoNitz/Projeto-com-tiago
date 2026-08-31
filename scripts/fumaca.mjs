@@ -125,6 +125,7 @@ const rotas = [
   "/estoque/novo",
   "/estoque/movimentacoes",
   "/inteligencia",
+  "/inteligencia/analise",
   "/mais",
   "/api/health",
 ];

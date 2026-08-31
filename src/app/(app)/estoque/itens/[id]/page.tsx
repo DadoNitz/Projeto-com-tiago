@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { FotosDaPeca } from "@/components/inventory/fotos";
 import { GerarAnuncio } from "@/components/inventory/gerar-anuncio";
 import { MovimentarUnidade } from "@/components/inventory/movimentar";
 import { Icone } from "@/components/layout/icon";
@@ -259,6 +260,19 @@ export default async function UnidadePage({
               </div>
             ))}
           </dl>
+        </section>
+      ) : null}
+
+      {can(ctx.role, "inventory:write") ? (
+        <section className="bg-card rounded-lg border p-4">
+          <h2 className="mb-3 text-sm font-medium">Fotos desta unidade</h2>
+          <FotosDaPeca
+            unitId={unidade.id}
+            iniciais={unidade.images.map((imagem) => ({
+              id: imagem.id,
+              url: `/api/imagens/${imagem.thumbnailKey ?? imagem.storageKey}`,
+            }))}
+          />
         </section>
       ) : null}
 
