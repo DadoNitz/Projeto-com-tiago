@@ -120,6 +120,8 @@ const rotas = [
   "/estoque/itens?q=3060",
   "/estoque/itens?status=AVAILABLE&ordenacao=valor-maior",
   "/socios",
+  "/montagens",
+  "/estoque/novo",
   "/mais",
   "/api/health",
 ];
