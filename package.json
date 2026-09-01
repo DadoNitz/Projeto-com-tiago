@@ -18,7 +18,8 @@
     "db:check": "node scripts/verificar-banco.mjs",
     "icons": "node scripts/gerar-icones.mjs",
     "extrato": "tsx scripts/extrato-socios.ts",
-    "smoke": "node --env-file=.env scripts/fumaca.mjs"
+    "smoke": "node --env-file=.env scripts/fumaca.mjs",
+    "cron:check": "node --env-file=.env scripts/testar-cron.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

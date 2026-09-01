@@ -19,6 +19,8 @@ registra o que existe, o que ficou de fora e por quê.
 | Fotos com câmera do celular | detalhe da unidade |
 | Extrato por sócio | `/socios` |
 | Marcas, locais e sócios | `/configuracoes` |
+| Edição de peça e do modelo | `/estoque/itens/[id]/editar` |
+| Notificações push + verificação diária | `/configuracoes`, `/api/cron/alertas` |
 | Dashboard | `/dashboard` |
 | PWA completo | `manifest.ts`, `public/sw.js` |
 
@@ -80,9 +82,6 @@ deixar para depois, e a arquitetura não a impede. Enfileirar movimentação de
 estoque sem mecanismo de resolução de conflito criaria inconsistência pior que
 a ausência da funcionalidade.
 
-**Push notifications.** Schema e arquitetura comportam; falta a implementação
-e as chaves VAPID.
-
 **Remoção de fundo das fotos.** O campo `cutoutKey` existe no banco. Falta
 escolher o provedor — a análise das duas opções está em `04-ROADMAP.md`.
 
@@ -95,9 +94,25 @@ definidas produz formulário vazio e uma categoria que o motor de
 compatibilidade não conhece. Elas nascem do catálogo versionado em código,
 aplicado pelo seed.
 
-**Edição de produto e unidade já cadastrados.** Existe cadastro, movimentação e
-exclusão lógica, mas não uma tela de edição dos campos. É a lacuna mais
-sentida hoje.
+## Notificações push
+
+Web Push com VAPID. A chave pública vai ao navegador de propósito — é pública
+por definição; a privada nunca sai do servidor. O conteúdo é cifrado com as
+chaves da própria inscrição, então nem o serviço de push do navegador o lê.
+Ainda assim, nada de sensível vai no corpo: a notificação diz o que aconteceu e
+leva à tela, e o detalhe fica atrás do login.
+
+A permissão só é pedida quando a pessoa clica. Pedir na abertura da página é o
+caminho mais curto para o "Bloquear" — e depois de bloqueado não há como pedir
+de novo.
+
+Uma verificação por dia, às 8h de São Paulo, disparada pelo agendamento da
+Vercel: estoque baixo, peças com defeito e reservas paradas há mais de 15 dias.
+Só notifica quando há algo a dizer.
+
+A rota do agendamento é pública no proxy (o agendador não tem sessão) mas tem
+autorização própria por segredo. Verificável com `npm run cron:check`, que
+confere as três situações: sem autorização, com segredo errado e com o certo.
 
 ## Restrições operacionais conhecidas
 
@@ -118,5 +133,8 @@ npm run typecheck   # tsc --noEmit
 npm run lint        # eslint
 npm test            # 125 testes (5 de IA são opt-in)
 npm run build       # build de produção
-npm run smoke       # login real + 20 rotas em produção
+npm run smoke       # login real + rotas em produção
+npm run cron:check  # autorização e execução do agendamento diário
+npm run extrato     # extrato por sócio
+npm run db:check    # DNS, autenticação e permissões do banco
 ```
