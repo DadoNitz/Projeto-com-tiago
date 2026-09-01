@@ -155,6 +155,14 @@ const lista = await req("/estoque/itens");
 const html = await lista.text();
 const m = html.match(/\/estoque\/itens\/([a-z0-9]{20,})/i);
 if (m) {
+  const edicao = await req("/estoque/itens/" + m[1] + "/editar");
+  console.log(
+    (edicao.status === 200 ? "  OK  " : "  FALHA ") +
+      "/estoque/itens/.../editar".padEnd(46),
+    edicao.status,
+  );
+  if (edicao.status !== 200) falhas++;
+
   const r = await req("/estoque/itens/" + m[1]);
   const corpoHtml = r.status === 200 ? await r.text() : "";
   const erro = corpoHtml.includes("__next_error__");

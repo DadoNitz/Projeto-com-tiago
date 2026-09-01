@@ -194,6 +194,9 @@ export async function buscarUnidade(id: string) {
           brand: true,
           images: { orderBy: { sortOrder: "asc" } },
           tags: { include: { tag: true } },
+          // Quantas unidades compartilham este modelo. A tela de edicao avisa
+          // antes de alterar a ficha tecnica de varias pecas de uma vez.
+          _count: { select: { units: true } },
         },
       },
       movements: {

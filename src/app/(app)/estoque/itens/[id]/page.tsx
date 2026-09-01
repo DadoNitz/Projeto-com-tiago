@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -121,6 +121,15 @@ export default async function UnidadePage({
                     : undefined
                 }
               />
+            ) : null}
+            {can(ctx.role, "inventory:write") ? (
+              <Link
+                href={`/estoque/itens/${unidade.id}/editar`}
+                className="hover:bg-muted inline-flex h-11 items-center gap-2 rounded-lg border px-4 text-sm"
+              >
+                <Pencil className="size-4" aria-hidden />
+                Editar
+              </Link>
             ) : null}
             {podeMovimentar ? (
               <MovimentarUnidade
