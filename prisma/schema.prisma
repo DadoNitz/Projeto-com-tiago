@@ -45,6 +45,7 @@ model User {
   conversations AIConversation[]
   verifiedOverrides CompatibilityOverride[]
   partner       Partner?
+  pushSubscriptions PushSubscription[]
 
   @@index([deletedAt])
   @@map("users")
@@ -731,6 +732,38 @@ model Listing {
   @@index([status, channel])
   @@index([deletedAt])
   @@map("listings")
+}
+
+// ---------------------------------------------------------------------------
+// Notificacoes push
+// ---------------------------------------------------------------------------
+
+/// Inscricao de um navegador para receber notificacoes push.
+///
+/// Uma pessoa costuma ter varias: celular, notebook, navegador do trabalho.
+/// Por isso a chave e o `endpoint`, e nao o usuario.
+///
+/// O endpoint e um endereco opaco fornecido pelo servico de push do
+/// navegador. Ele expira sozinho quando o usuario desinstala o app ou limpa
+/// os dados do site — por isso o envio remove a inscricao ao receber 404/410
+/// em vez de tentar de novo para sempre.
+model PushSubscription {
+  id       String @id @default(cuid())
+  userId   String
+  endpoint String @unique
+  /// Chaves de criptografia da inscricao. O conteudo da notificacao e
+  /// cifrado com elas: nem o servico de push do navegador consegue ler.
+  p256dh   String
+  auth     String
+
+  userAgent String?
+  createdAt DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 // ---------------------------------------------------------------------------

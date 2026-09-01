@@ -20,7 +20,7 @@
  */
 
 // Trocar esta versao invalida todos os caches antigos no activate.
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const STATIC_CACHE = `estoque-static-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline";
 
@@ -131,6 +131,67 @@ async function navegacao(request) {
     );
   }
 }
+
+/**
+ * Notificacao push recebida.
+ *
+ * O corpo chega cifrado e e decifrado pelo proprio navegador com as chaves da
+ * inscricao. Ainda assim nao mandamos dado sensivel: a notificacao diz o que
+ * aconteceu e leva a tela; o detalhe fica atras do login.
+ */
+self.addEventListener("push", (event) => {
+  let dados = {};
+  try {
+    dados = event.data ? event.data.json() : {};
+  } catch {
+    // Payload malformado nao pode impedir a notificacao de aparecer.
+  }
+
+  const titulo = dados.titulo || "Estoque de Hardware";
+
+  event.waitUntil(
+    self.registration.showNotification(titulo, {
+      body: dados.corpo || "",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      // A tag agrupa: um alerta novo substitui o anterior do mesmo assunto em
+      // vez de empilhar cinco notificacoes na bandeja.
+      tag: dados.tag || "estoque",
+      data: { url: dados.url || "/dashboard" },
+      lang: "pt-BR",
+    }),
+  );
+});
+
+/**
+ * Toque na notificacao.
+ *
+ * Reaproveita uma aba ja aberta do sistema em vez de abrir outra: quem esta
+ * com o app aberto no celular nao quer uma segunda instancia.
+ */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const destino = (event.notification.data && event.notification.data.url) || "/dashboard";
+
+  event.waitUntil(
+    (async () => {
+      const janelas = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+
+      for (const janela of janelas) {
+        if (janela.url.includes(self.location.origin)) {
+          await janela.focus();
+          if ("navigate" in janela) await janela.navigate(destino);
+          return;
+        }
+      }
+
+      await self.clients.openWindow(destino);
+    })(),
+  );
+});
 
 self.addEventListener("message", (event) => {
   const tipo = event.data && event.data.type;

@@ -55,6 +55,10 @@ export const authConfig = {
         // conexão receberia HTML em vez de 204 e declararia o app offline —
         // exatamente o erro que a seção 33 manda evitar. Não revela nada.
         pathname === "/api/health" ||
+        // Disparada pelo agendamento da Vercel, que nao tem sessao. A rota
+        // tem autorizacao propria por segredo compartilhado; deixa-la aqui
+        // seria um gatilho publico de notificacao para toda a equipe.
+        pathname === "/api/cron/alertas" ||
         pathname === "/manifest.webmanifest" ||
         pathname === "/sw.js" ||
         pathname === "/offline";

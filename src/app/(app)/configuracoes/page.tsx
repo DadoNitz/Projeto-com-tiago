@@ -11,6 +11,8 @@ import {
 } from "@/server/services/catalog.service";
 import { requireContext } from "@/server/session";
 
+import { AtivarNotificacoes } from "@/components/pwa/notificacoes";
+
 import { ListaEditavel } from "./formularios";
 
 export const metadata: Metadata = { title: "Configurações" };
@@ -27,6 +29,10 @@ export const dynamic = "force-dynamic";
 export default async function ConfiguracoesPage() {
   const ctx = await requireContext();
   if (!can(ctx.role, "catalog:write")) redirect("/dashboard");
+
+  // A chave publica VAPID vai ao navegador de proposito: ela e publica por
+  // definicao. A privada nunca sai do servidor.
+  const chaveVapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
   const [marcas, locais, socios, categorias] = await Promise.all([
     listarMarcasComUso(),
@@ -45,6 +51,25 @@ export default async function ConfiguracoesPage() {
           Você está como {ROLE_LABELS[ctx.role].toLowerCase()}.
         </p>
       </div>
+
+      <section className="bg-card rounded-lg border">
+        <header className="border-b px-4 py-3">
+          <h2 className="text-sm font-medium">Notificações neste aparelho</h2>
+          <p className="text-muted-foreground text-xs">
+            A permissão vale por navegador. Ative em cada aparelho que você usa.
+          </p>
+        </header>
+        <div className="p-4">
+          {chaveVapid ? (
+            <AtivarNotificacoes chavePublica={chaveVapid} />
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              Notificações não configuradas neste servidor. Defina as chaves
+              VAPID no ambiente para habilitar.
+            </p>
+          )}
+        </div>
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <ListaEditavel
