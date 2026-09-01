@@ -131,7 +131,7 @@ desenvolvimento. O script de fumaça tem fallback para DNS público.
 ```
 npm run typecheck   # tsc --noEmit
 npm run lint        # eslint
-npm test            # 125 testes (5 de IA são opt-in)
+npm test            # 134 testes (5 de IA são opt-in)
 npm run build       # build de produção
 npm run smoke       # login real + rotas em produção
 npm run cron:check  # autorização e execução do agendamento diário
