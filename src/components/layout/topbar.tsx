@@ -122,7 +122,15 @@ export function Topbar({
             <p className="text-muted-foreground text-xs">{ROLE_LABELS[role]}</p>
           </div>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={sair} disabled={saindo}>
+          {/*
+            `onClick`, nao `onSelect`.
+
+            O `Menu.Item` do Base UI renderiza um `div`, e `onSelect` num div e
+            o evento de SELECAO DE TEXTO do navegador — o TypeScript aceita
+            porque existe em HTMLProps, e nada avisa. O resultado era um botao
+            de sair que nunca chamava nada.
+          */}
+          <DropdownMenuItem onClick={sair} disabled={saindo}>
             <LogOut className="size-4" aria-hidden />
             {saindo ? "Saindo…" : "Sair"}
           </DropdownMenuItem>

@@ -13,8 +13,16 @@ export default defineConfig({
     },
   },
   test: {
+    // Node por padrao. Os testes de componente pedem jsdom pelo comentario
+    // `@vitest-environment jsdom` no topo do arquivo — assim a suite inteira
+    // nao paga o custo de montar um DOM.
     environment: "node",
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "tests/**/*.test.ts"],
+    include: [
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+      "tests/**/*.test.ts",
+      "tests/**/*.test.tsx",
+    ],
     globals: false,
     setupFiles: ["tests/setup.ts"],
     env: {
