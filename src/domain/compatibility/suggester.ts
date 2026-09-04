@@ -6,6 +6,7 @@ import type {
   Componente,
   MontagemCandidata,
   ResultadoDeCompatibilidade,
+  VerificacaoManual,
 } from "./types";
 
 /**
@@ -303,6 +304,11 @@ export interface OpcoesDeSugestao {
   maximo?: number;
   /** Incluir montagens que o motor reprovou, para mostrar o que falta. */
   incluirIncompativeis?: boolean;
+  /**
+   * Conferências já feitas por pessoas, para não repetir avisos resolvidos.
+   * Ver `VerificacaoManual`.
+   */
+  verificacoes?: ReadonlyMap<string, VerificacaoManual>;
 }
 
 export function sugerirMontagens(
@@ -342,7 +348,10 @@ export function sugerirMontagens(
       const montagem = montarEmTornoDe(cpu, motherboard, restante);
       if (!montagem) continue;
 
-      const compatibilidade = avaliarCompatibilidade(montagem);
+      const compatibilidade = avaliarCompatibilidade(
+        montagem,
+        opcoes.verificacoes,
+      );
 
       if (
         compatibilidade.nivel === "INCOMPATIBLE" &&

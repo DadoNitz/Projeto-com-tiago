@@ -82,6 +82,14 @@ export interface ResultadoDeRegra {
   /** Explicação em português, escrita para o usuário final. */
   mensagem: string;
   /**
+   * Peça a que este check se refere, quando ele admite verificação manual.
+   *
+   * Só regras que declaram um sujeito podem ser resolvidas por conferência
+   * humana. Sem isso, uma verificação registrada em qualquer peça da montagem
+   * satisfaria qualquer aviso — e o recurso viraria um "ignorar" genérico.
+   */
+  subjectId?: string;
+  /**
    * Campos de especificação que faltavam para decidir.
    *
    * É o que transforma "precisa verificar" em ação concreta: a interface
@@ -104,3 +112,32 @@ export interface ResultadoDeCompatibilidade {
 
 /** Contexto passado a cada regra. */
 export type Regra = (montagem: MontagemCandidata) => ResultadoDeRegra | null;
+
+/**
+ * Verificação manual feita por uma pessoa sobre uma peça específica.
+ *
+ * Existe para um caso concreto e recorrente: a B450 avisa que precisa de BIOS
+ * atualizada para Ryzen 5000. O aviso está certo — mas depois de conferir
+ * aquela placa e constatar que a BIOS já está atualizada, ele vira ruído que
+ * reaparece em toda sugestão, para sempre. Aviso permanente que a pessoa
+ * aprende a ignorar deixa de proteger.
+ *
+ * A verificação é da UNIDADE física, nunca do modelo: versão de BIOS é
+ * propriedade daquela placa, não do produto. Outra B450 idêntica continua
+ * pedindo verificação, como deve.
+ */
+export interface VerificacaoManual {
+  /** Qual regra foi verificada (`ResultadoDeRegra.regra`). */
+  ruleKey: string;
+  /** Id da unidade física verificada. */
+  subjectId: string;
+  /** Quem verificou e o que constatou — vai para a mensagem exibida. */
+  reason: string;
+  verificadoPor?: string | undefined;
+  verificadoEm?: Date | undefined;
+}
+
+/** Chave de busca das verificações: regra + unidade. */
+export function chaveDaVerificacao(ruleKey: string, subjectId: string): string {
+  return `${ruleKey}::${subjectId}`;
+}

@@ -3,10 +3,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { SalvarMontagem } from "@/components/inventory/salvar-montagem";
+import { VerificarCheck } from "@/components/inventory/verificar-check";
 import { ROTULO_NIVEL, type NivelCompatibilidade } from "@/domain/compatibility/types";
 import type { Componente } from "@/domain/compatibility/types";
 import { formatarMoeda, formatarNumero } from "@/lib/format";
+import { can } from "@/lib/auth/permissions";
 import { montarPainelDeSugestoes } from "@/server/services/build.service";
+import { requireContext } from "@/server/session";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Montar com meu estoque" };
@@ -31,7 +34,12 @@ const COR_NIVEL: Record<NivelCompatibilidade, string> = {
  * cadastradas (seção 25).
  */
 export default async function MontagensPage() {
-  const painel = await montarPainelDeSugestoes();
+  const [painel, ctx] = await Promise.all([
+    montarPainelDeSugestoes(),
+    requireContext(),
+  ]);
+
+  const podeVerificar = can(ctx.role, "build:write");
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -213,8 +221,24 @@ export default async function MontagensPage() {
                             )}
                             aria-hidden
                           />
-                          <span className="text-muted-foreground">
-                            {check.mensagem}
+                          <span className="min-w-0 flex-1">
+                            <span className="text-muted-foreground block">
+                              {check.mensagem}
+                            </span>
+                            {/* So aparece quando a regra declara sobre qual
+                                peca fala: sem sujeito nao ha o que conferir. */}
+                            {check.nivel === "NEEDS_VERIFICATION" &&
+                            check.subjectId &&
+                            podeVerificar ? (
+                              <span className="mt-1.5 block">
+                                <VerificarCheck
+                                  ruleKey={check.regra}
+                                  unitId={check.subjectId}
+                                  titulo={check.titulo}
+                                  contexto={check.mensagem}
+                                />
+                              </span>
+                            ) : null}
                           </span>
                         </li>
                       ))}

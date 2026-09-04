@@ -1,9 +1,11 @@
 import { estimarConsumo, recomendarFonte, REGRAS } from "./rules";
 import {
+  chaveDaVerificacao,
   piorNivel,
   type MontagemCandidata,
   type ResultadoDeCompatibilidade,
   type ResultadoDeRegra,
+  type VerificacaoManual,
 } from "./types";
 
 /**
@@ -36,8 +38,49 @@ function pecasFaltando(montagem: MontagemCandidata): string[] {
   return faltando;
 }
 
+/**
+ * Aplica uma verificação manual a um check.
+ *
+ * Duas travas de segurança:
+ *
+ * 1. Só regras que declaram `subjectId` são verificáveis, e a busca é exata
+ *    por (regra, peça). Procurar em qualquer peça da montagem faria uma
+ *    verificação de BIOS registrada num processador satisfazer o aviso da
+ *    placa — o recurso viraria um "ignorar aviso" genérico.
+ * 2. Uma verificação só resolve `NEEDS_VERIFICATION`. Ela NUNCA transforma
+ *    `INCOMPATIBLE` em compatível.
+ *
+ * A diferença é a razão de existirem dois níveis distintos.
+ * `NEEDS_VERIFICATION` significa "o sistema não sabe" — e uma pessoa que
+ * olhou a peça sabe mais que o sistema. `INCOMPATIBLE` significa "o sistema
+ * sabe que não funciona": socket AM4 não entra em placa LGA1700, e nenhuma
+ * conferência humana muda isso. Permitir a exceção aqui transformaria o motor
+ * num campo de "ignorar aviso", que é como sistemas de checagem morrem.
+ */
+function aplicarVerificacao(
+  check: ResultadoDeRegra,
+  verificacoes: ReadonlyMap<string, VerificacaoManual>,
+): ResultadoDeRegra {
+  if (check.nivel !== "NEEDS_VERIFICATION") return check;
+  if (!check.subjectId) return check;
+
+  const verificacao = verificacoes.get(
+    chaveDaVerificacao(check.regra, check.subjectId),
+  );
+  if (!verificacao) return check;
+
+  return {
+    ...check,
+    nivel: "COMPATIBLE",
+    mensagem: `Verificado manualmente: ${verificacao.reason}`,
+    // O campo deixa de faltar: alguém foi olhar.
+    camposFaltando: undefined,
+  };
+}
+
 export function avaliarCompatibilidade(
   montagem: MontagemCandidata,
+  verificacoes: ReadonlyMap<string, VerificacaoManual> = new Map(),
 ): ResultadoDeCompatibilidade {
   const checks: ResultadoDeRegra[] = [];
 
@@ -45,7 +88,7 @@ export function avaliarCompatibilidade(
     // Regra que não se aplica devolve null: uma montagem sem placa de vídeo
     // não deve produzir um check de conectores PCIe.
     const resultado = regra(montagem);
-    if (resultado) checks.push(resultado);
+    if (resultado) checks.push(aplicarVerificacao(resultado, verificacoes));
   }
 
   const consumoEstimadoW = estimarConsumo(montagem);

@@ -116,6 +116,9 @@ export const biosDaPlaca: Regra = ({ cpu, motherboard }) => {
     regra: "bios-placa",
     titulo: "Versão da BIOS",
     nivel: "NEEDS_VERIFICATION",
+    // A BIOS é propriedade desta placa física. Conferir uma não diz nada
+    // sobre outra do mesmo modelo.
+    subjectId: motherboard.id,
     mensagem: `A ${motherboard.nome} só aceita ${exigencia} com a BIOS atualizada. Confirme a versão gravada nesta placa antes de montar — atualizar depois costuma exigir um processador mais antigo para dar boot.`,
     camposFaltando: ["versão da BIOS da placa"],
   };

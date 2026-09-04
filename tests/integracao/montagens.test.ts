@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { prisma } from "@/server/db/client";
 import { montarPainelDeSugestoes } from "@/server/services/build.service";
+import {
+  carregarVerificacoes,
+  registrarVerificacao,
+  removerVerificacao,
+} from "@/server/services/verification.service";
 
 /**
  * Sugestoes contra o estoque real do seed.
@@ -70,6 +76,68 @@ describe("montagens a partir do estoque real", () => {
       expect(typeof potencia).toBe("number");
       expect(potencia as number).toBeGreaterThanOrEqual(
         sugestao.compatibilidade.consumoEstimadoW,
+      );
+    }
+  });
+});
+
+describe("verificacao manual de compatibilidade", () => {
+  it("resolve o aviso de BIOS da placa conferida, e so dela", async () => {
+    // A B450 do seed avisa que precisa de BIOS atualizada para Ryzen 5000.
+    // Sem esse recurso, o aviso reaparece em toda sugestao para sempre.
+    const usuario = await prisma.user.findFirstOrThrow({
+      where: { role: "ADMIN" },
+      select: { id: true, name: true, role: true },
+    });
+    const ctx = {
+      userId: usuario.id,
+      role: usuario.role,
+      name: usuario.name,
+      ip: null,
+      userAgent: "vitest",
+    };
+
+    const placa = await prisma.inventoryUnit.findFirst({
+      where: {
+        status: "AVAILABLE",
+        product: { is: { name: { contains: "B450" } } },
+      },
+      select: { id: true },
+    });
+
+    if (!placa) return;
+
+    try {
+      await registrarVerificacao(
+        {
+          ruleKey: "bios-placa",
+          unitId: placa.id,
+          reason: "BIOS conferida na bancada, versao F65",
+        },
+        ctx,
+      );
+
+      const verificacoes = await carregarVerificacoes();
+      const chave = `bios-placa::${placa.id}`;
+      expect(verificacoes.has(chave)).toBe(true);
+      expect(verificacoes.get(chave)?.verificadoPor).toBe(usuario.name);
+
+      // O painel roda o motor com as verificacoes carregadas.
+      const painel = await montarPainelDeSugestoes(8);
+      for (const sugestao of painel.sugestoes) {
+        const bios = sugestao.compatibilidade.checks.find(
+          (check) => check.regra === "bios-placa",
+        );
+        if (bios && sugestao.montagem.motherboard?.id === placa.id) {
+          expect(bios.nivel).toBe("COMPATIBLE");
+          expect(bios.mensagem).toContain("F65");
+        }
+      }
+    } finally {
+      await removerVerificacao({ ruleKey: "bios-placa", unitId: placa.id }, ctx);
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM "audit_logs" WHERE "entityId" = $1`,
+        placa.id,
       );
     }
   });

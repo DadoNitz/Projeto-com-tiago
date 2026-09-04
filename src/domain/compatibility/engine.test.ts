@@ -560,3 +560,82 @@ describe("estimativa de energia", () => {
     }
   });
 });
+
+describe("verificação manual", () => {
+  const b450ComRyzen = montagem({ cpu: ryzen5600, motherboard: b450 });
+
+  function verificacoes(ruleKey: string, subjectId: string) {
+    return new Map([
+      [
+        `${ruleKey}::${subjectId}`,
+        {
+          ruleKey,
+          subjectId,
+          reason: "BIOS conferida, versão F65 já instalada",
+        },
+      ],
+    ]);
+  }
+
+  it("resolve um aviso de verificação sobre a peça conferida", () => {
+    const antes = avaliarCompatibilidade(b450ComRyzen);
+    expect(checkDe(antes, "bios-placa")?.nivel).toBe("NEEDS_VERIFICATION");
+
+    const depois = avaliarCompatibilidade(
+      b450ComRyzen,
+      verificacoes("bios-placa", b450.id),
+    );
+    const check = checkDe(depois, "bios-placa");
+    expect(check?.nivel).toBe("COMPATIBLE");
+    expect(check?.mensagem).toContain("F65");
+    expect(check?.camposFaltando).toBeUndefined();
+  });
+
+  it("NUNCA transforma incompatível em compatível", () => {
+    // O limite que sustenta a confianca no motor. "Precisa verificar" quer
+    // dizer "o sistema nao sabe", e a pessoa que olhou a peca sabe mais.
+    // "Incompativel" quer dizer "o sistema sabe que nao funciona" — socket AM4
+    // nao entra em LGA1700, e nenhuma conferencia muda isso. Sem esse limite,
+    // o motor viraria um campo de "ignorar aviso".
+    const incompativel = montagem({ cpu: i512400f, motherboard: b550 });
+    const resultado = avaliarCompatibilidade(
+      incompativel,
+      verificacoes("socket-cpu-placa", b550.id),
+    );
+
+    expect(checkDe(resultado, "socket-cpu-placa")?.nivel).toBe("INCOMPATIBLE");
+    expect(resultado.nivel).toBe("INCOMPATIBLE");
+  });
+
+  it("verificação de uma peça não vale para outra igual", () => {
+    // Versão de BIOS é propriedade da placa física, não do modelo. Outra B450
+    // idêntica continua pedindo verificação, como deve.
+    // Mesmo modelo, unidade fisica diferente — que e como chega do banco: o
+    // id do Componente e o da InventoryUnit, nunca o do produto.
+    const outraB450: Componente = {
+      ...b450,
+      id: "outra-unidade-b450",
+    };
+    const resultado = avaliarCompatibilidade(
+      montagem({ cpu: ryzen5600, motherboard: outraB450 }),
+      verificacoes("bios-placa", b450.id),
+    );
+
+    expect(checkDe(resultado, "bios-placa")?.nivel).toBe("NEEDS_VERIFICATION");
+  });
+
+  it("verificação de outra regra não afeta a regra em questão", () => {
+    const resultado = avaliarCompatibilidade(
+      b450ComRyzen,
+      verificacoes("potencia-fonte", b450.id),
+    );
+    expect(checkDe(resultado, "bios-placa")?.nivel).toBe("NEEDS_VERIFICATION");
+  });
+
+  it("sem verificações, o comportamento é exatamente o de antes", () => {
+    const semMapa = avaliarCompatibilidade(b450ComRyzen);
+    const comMapaVazio = avaliarCompatibilidade(b450ComRyzen, new Map());
+    expect(comMapaVazio.checks).toEqual(semMapa.checks);
+    expect(comMapaVazio.nivel).toBe(semMapa.nivel);
+  });
+});

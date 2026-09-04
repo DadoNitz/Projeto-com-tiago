@@ -11,6 +11,8 @@ import type { Componente } from "@/domain/compatibility/types";
 import type { SpecRecord } from "@/domain/specs/types";
 import { prisma } from "@/server/db/client";
 
+import { carregarVerificacoes } from "./verification.service";
+
 /**
  * "Montar com meu estoque" (seção 6).
  *
@@ -129,10 +131,14 @@ export interface PainelDeMontagens {
 export async function montarPainelDeSugestoes(
   maximo = 8,
 ): Promise<PainelDeMontagens> {
-  const { estoque, precoPorUnidade } = await carregarEstoqueParaMontagem();
+  const [{ estoque, precoPorUnidade }, verificacoes] = await Promise.all([
+    carregarEstoqueParaMontagem(),
+    carregarVerificacoes(),
+  ]);
 
   const sugestoes = sugerirMontagens(estoque, {
     maximo,
+    verificacoes,
     // Montagens reprovadas também aparecem: saber que a RTX 3060 não cabe no
     // gabinete disponível é informação útil, não ruído.
     incluirIncompativeis: true,
