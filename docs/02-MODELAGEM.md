@@ -14,7 +14,6 @@ A spec permitia propor modelagem melhor. As mudanças propostas:
 | `ItemImage` | `ProductImage` + `UnitImage` | Foto do modelo (catálogo) é diferente de foto da unidade física (estado real, etiqueta, avaria). Ambas são necessárias. |
 | `Role` como tabela | `enum Role` | Três perfis fixos e bem definidos. Tabela traria join em toda request sem ganho. Permissões ficam em código (`lib/auth/permissions.ts`), versionadas junto com as regras. |
 | `CompatibilityRule` como tabela | Regras em código | Regra de compatibilidade é lógica, não dado. Em tabela ficaria intestável e sujeita a edição sem revisão. A tabela existe apenas para **overrides manuais** (`CompatibilityOverride`). |
-| — | `StockLot` | Ausente na spec, necessário para custo médio e giro por lote. Fica preparado, sem uso no MVP. |
 
 ## Entidades
 
@@ -64,9 +63,9 @@ Tipos: `INBOUND, OUTBOUND, SALE, RESERVE, UNRESERVE, RETURN, DEFECT, DISCARD, BU
 
 **`BuildItem`** — liga `Build` a `InventoryUnit` com `role` (`CPU`, `MOTHERBOARD`, `RAM`, ...) e `quantity`. A unidade alocada tem status `IN_BUILD`; cancelar a montagem devolve ao estoque via movimentação, nunca por edição direta.
 
-**`BuildSuggestion`** — sugestões geradas pelo motor + IA, com `score`, `tier`, `useCase`, `compatibility` (JSONB com o resultado completo do motor), `missingParts` (JSONB). Persistidas para não recalcular e para dar histórico.
+As sugestões de montagem **não** são persistidas — são calculadas ao vivo a partir do estoque atual. Ver "Tabelas removidas depois de prontas", no fim deste documento.
 
-**`CompatibilityOverride`** — exceção manual verificada por humano ("essa B450 já está com a BIOS atualizada para Ryzen 5000"). Tem `verifiedBy` e `verifiedAt`.
+**`CompatibilityOverride`** — conferência manual de uma peça física, registrada com quem verificou e quando ("esta B450 já está com a BIOS atualizada"). Só resolve avisos de `NEEDS_VERIFICATION`, e apenas da unidade conferida: nunca transforma `INCOMPATIBLE` em compatível, e não vale para outra peça do mesmo modelo. Ver `domain/compatibility/engine.ts`.
 
 ### IA (Fase 3, schema pronto na Fase 1)
 
@@ -137,3 +136,25 @@ O plano inicial previa índices GIN trigram (`pg_trgm`) em `name`, `model` e `pa
 No MVP a busca usa `ILIKE %termo%` (via `contains` + `mode: insensitive`). Para a ordem de grandeza real deste estoque — milhares de linhas, não milhões — isso responde em poucos milissegundos. Quando o volume justificar, trigram entra como migration própria, com a extensão declarada.
 
 O que **não** se abriu mão: busca por serial e por código interno usa índice de verdade. `serialLast` existe justamente para não precisar de `LIKE '%7812'`, que ignora índice e varre a tabela inteira.
+
+## Tabelas removidas depois de prontas
+
+**`BuildSuggestion`** foi criada na modelagem inicial para guardar as sugestões
+de montagem, e removida na migration `20260901230000_remove_build_suggestions`
+sem nunca ter sido usada.
+
+O motivo não é só que ninguém a escrevia. Sugestão de montagem é calculada ao
+vivo a partir do estoque atual e envelhece no instante em que uma peça é
+vendida. Uma sugestão gravada citando uma GPU que já saiu do estoque é uma
+afirmação falsa com aparência de dado — exatamente o contrário do que o resto
+do sistema faz ao distinguir "não sabemos" de "sabemos que não".
+
+Fica o registro como aviso: "deixar preparado para o futuro" só se paga quando
+a tabela é difícil de acrescentar depois. Uma tabela isolada, sem relação com o
+núcleo, é barata de criar quando a necessidade aparecer — e cara de manter
+enquanto não aparece, porque quem lê o schema supõe que existe uma
+funcionalidade que não existe.
+
+**`StockLot`** aparecia na tabela de decisões deste documento como "preparado,
+sem uso no MVP". Nunca chegou a ser criada. A linha foi removida: documento que
+descreve o que não existe é pior que documento incompleto.

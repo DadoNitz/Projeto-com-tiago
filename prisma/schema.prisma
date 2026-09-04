@@ -545,35 +545,6 @@ enum CompatibilityLevel {
   INCOMPATIBLE
 }
 
-/// Sugestão gerada pelo motor determinístico e narrada pela IA.
-/// Persistida para não recalcular e para dar histórico das recomendações.
-model BuildSuggestion {
-  id            String             @id @default(cuid())
-  title         String
-  /// unidades sugeridas, por papel
-  components    Json
-  missingParts  Json               @default("[]")
-  /// resultado íntegro do CompatibilityEngine (checks, avisos, veredito)
-  compatibility Json
-  level         CompatibilityLevel
-  score         Int                @default(0)
-  tier          String?
-  useCase       String?
-  estimatedWatts Int?
-  recommendedPsuWatts Int?
-  estimatedValue Decimal?          @db.Decimal(12, 2)
-  /// texto gerado pela IA a partir do veredito já calculado
-  aiNarrative   String?
-  dismissed     Boolean            @default(false)
-
-  createdAt DateTime @default(now())
-
-  @@index([dismissed, score])
-  @@map("build_suggestions")
-}
-
-/// Exceção manual verificada por um humano.
-/// Ex.: "esta B450 específica já está com a BIOS atualizada para Ryzen 5000".
 model CompatibilityOverride {
   id           String   @id @default(cuid())
   ruleKey      String
