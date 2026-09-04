@@ -1,12 +1,10 @@
 import { redirect } from "next/navigation";
 
 import { BottomNav } from "@/components/layout/bottom-nav";
-import { BotaoAdicionar } from "@/components/layout/fab";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { PwaProvider } from "@/components/pwa/pwa-provider";
-import { can } from "@/lib/auth/permissions";
 import { getContext } from "@/server/session";
 
 /**
@@ -39,10 +37,10 @@ export default async function AppLayout({
         </PwaProvider>
       </div>
 
+      {/* O "Adicionar" mora so na barra inferior, com destaque proprio. Havia
+          tambem um botao flutuante fazendo a mesma coisa, e os dois juntos
+          disputavam o mesmo canto da tela. */}
       <BottomNav role={ctx.role} />
-      {/* Quem so consulta nao ve o botao: um atalho que sempre recusa a acao
-          e pior do que atalho nenhum. */}
-      {can(ctx.role, "inventory:write") ? <BotaoAdicionar /> : null}
       <InstallPrompt />
     </div>
   );
