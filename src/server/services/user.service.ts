@@ -2,6 +2,7 @@ import "server-only";
 
 import { compare, hash } from "bcryptjs";
 
+import { CUSTO_HASH, validarSenha } from "@/domain/auth/password";
 import { Role } from "@/generated/prisma/enums";
 import { prisma } from "@/server/db/client";
 import type { ActionContext } from "@/server/session";
@@ -22,47 +23,6 @@ import {
  *
  * Nenhuma senha em claro sai daqui, nem em log, nem em retorno de função.
  */
-
-/** Custo do bcrypt. 12 é o equilíbrio atual entre segurança e latência. */
-const CUSTO_HASH = 12;
-
-const TAMANHO_MINIMO = 10;
-
-/**
- * Valida a senha.
- *
- * Comprimento acima de tudo: uma senha longa resiste muito mais a força bruta
- * que uma curta cheia de símbolos, e é mais fácil de lembrar — regras de
- * "um número e um símbolo" empurram para `Senha@1`, que é pior.
- */
-export function validarSenha(senha: string): string | null {
-  if (senha.length < TAMANHO_MINIMO) {
-    return `A senha precisa de pelo menos ${TAMANHO_MINIMO} caracteres.`;
-  }
-
-  /*
-   * Palavras óbvias só condenam a senha quando ela é *feita* delas.
-   *
-   * Barrar toda senha que contenha "senha" rejeitaria
-   * `cavalo senha grampo bateria` — uma frase de 27 caracteres, forte, do tipo
-   * que se quer incentivar. A checagem certa é o que sobra depois de remover
-   * as partes previsíveis: "senha123456" vira nada; a frase acima continua
-   * com material de sobra.
-   */
-  const comuns = [
-    "senha", "password", "123456", "admin", "qwerty", "estoque", "hardware",
-  ];
-
-  let restante = senha.toLowerCase();
-  for (const comum of comuns) restante = restante.split(comum).join("");
-  restante = restante.replace(/[\d\s]/g, "");
-
-  if (restante.length < 6) {
-    return "Essa senha é fácil de adivinhar. Use uma frase que só você saiba.";
-  }
-
-  return null;
-}
 
 export async function listarUsuarios() {
   return prisma.user.findMany({

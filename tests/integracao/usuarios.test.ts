@@ -3,13 +3,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Role } from "@/generated/prisma/enums";
 import { prisma } from "@/server/db/client";
 import { ConflitoError, RegraDeNegocioError } from "@/server/services/errors";
+import { validarSenha } from "@/domain/auth/password";
 import {
   alterarPapel,
   criarUsuario,
   definirAtivo,
   redefinirSenha,
   trocarPropriaSenha,
-  validarSenha,
 } from "@/server/services/user.service";
 import type { ActionContext } from "@/server/session";
 
@@ -72,6 +72,17 @@ describe("validação de senha", () => {
     expect(validarSenha("senha123456")).not.toBeNull();
     expect(validarSenha("admin123456")).not.toBeNull();
     expect(validarSenha("estoque2024")).not.toBeNull();
+  });
+
+  it("aceita senha sem palavra obvia, mesmo com muitos digitos", () => {
+    // Regressao: a checagem do que "sobra" descartava todos os digitos e
+    // reprovava `Nitz351642` — dez caracteres, nada previsivel. A pergunta
+    // certa nao e quantas letras sobram, e sim se a senha e FEITA de partes
+    // conhecidas.
+    expect(validarSenha("Nitz351642")).toBeNull();
+    expect(validarSenha("Xk94027153")).toBeNull();
+    // Mas uma sequencia obvia continua reprovada, mesmo com letras na frente.
+    expect(validarSenha("Ab12345678")).not.toBeNull();
   });
 
   it("aceita frase longa que por acaso contem uma palavra obvia", () => {

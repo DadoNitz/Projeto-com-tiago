@@ -29,5 +29,9 @@ export default defineConfig({
     fileParallelism: false,
     // Chamadas a modelo de IA na camada gratuita passam de 30s com facilidade.
     testTimeout: 120_000,
+    // Os hooks de preparacao criam dados no banco remoto; o padrao de 10s
+    // estoura antes de terminar, e o teste falha por infraestrutura em vez de
+    // por regra.
+    hookTimeout: 120_000,
   },
 });

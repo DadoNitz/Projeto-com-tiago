@@ -20,7 +20,8 @@
     "extrato": "tsx scripts/extrato-socios.ts",
     "smoke": "node --env-file=.env scripts/fumaca.mjs",
     "cron:check": "node --env-file=.env scripts/testar-cron.mjs",
-    "limpar-demo": "tsx scripts/limpar-demonstracao.ts"
+    "limpar-demo": "tsx scripts/limpar-demonstracao.ts",
+    "usuario": "tsx scripts/criar-usuario.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
