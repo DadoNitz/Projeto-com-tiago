@@ -1,4 +1,6 @@
+import { Users } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { can, ROLE_LABELS } from "@/lib/auth/permissions";
@@ -12,6 +14,7 @@ import {
 import { requireContext } from "@/server/session";
 
 import { AtivarNotificacoes } from "@/components/pwa/notificacoes";
+import { TrocarSenha } from "@/components/pwa/trocar-senha";
 
 import { ListaEditavel } from "./formularios";
 
@@ -34,6 +37,8 @@ export default async function ConfiguracoesPage() {
   // definicao. A privada nunca sai do servidor.
   const chaveVapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
+  const podeGerirUsuarios = can(ctx.role, "user:manage");
+
   const [marcas, locais, socios, categorias] = await Promise.all([
     listarMarcasComUso(),
     listarLocais(),
@@ -51,6 +56,38 @@ export default async function ConfiguracoesPage() {
           Você está como {ROLE_LABELS[ctx.role].toLowerCase()}.
         </p>
       </div>
+
+      <section className="bg-card rounded-lg border">
+        <header className="border-b px-4 py-3">
+          <h2 className="text-sm font-medium">Minha senha</h2>
+          <p className="text-muted-foreground text-xs">
+            Vale para todos os aparelhos.
+          </p>
+        </header>
+        <div className="p-4">
+          <TrocarSenha />
+        </div>
+      </section>
+
+      {podeGerirUsuarios ? (
+        <section className="bg-card rounded-lg border">
+          <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
+            <div>
+              <h2 className="text-sm font-medium">Usuários</h2>
+              <p className="text-muted-foreground text-xs">
+                Quem tem acesso e o que cada um pode fazer.
+              </p>
+            </div>
+            <Link
+              href="/configuracoes/usuarios"
+              className="hover:bg-muted inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm"
+            >
+              <Users className="size-4" aria-hidden />
+              Gerenciar
+            </Link>
+          </header>
+        </section>
+      ) : null}
 
       <section className="bg-card rounded-lg border">
         <header className="border-b px-4 py-3">

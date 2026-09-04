@@ -105,10 +105,30 @@ async function semearUsuarios() {
     throw new Error("SEED_ADMIN_PASSWORD precisa de pelo menos 8 caracteres.");
   }
 
+  /*
+   * Contas de teste só existem em desenvolvimento.
+   *
+   * Elas nasceram com senha fixa escrita neste arquivo — que está versionado.
+   * Rodar o seed contra o banco de produção criava duas contas cuja senha
+   * qualquer pessoa com acesso ao repositório conhece, uma delas com
+   * permissão para movimentar estoque. Foi o que aconteceu, e as contas
+   * precisaram ser desativadas à mão.
+   *
+   * A trava é pelo ambiente, e não pela lembrança de quem roda o comando.
+   */
+  const ehProducao =
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL_ENV === "production" ||
+    process.env.SEED_SEM_CONTAS_DE_TESTE === "1";
+
   const usuarios = [
     { email: emailAdmin, name: "Administrador", role: "ADMIN" as const, senha: senhaAdmin },
-    { email: "funcionario@local", name: "Funcionário de teste", role: "EMPLOYEE" as const, senha: "funcionario123" },
-    { email: "consulta@local", name: "Consulta de teste", role: "VIEWER" as const, senha: "consulta123" },
+    ...(ehProducao
+      ? []
+      : [
+          { email: "funcionario@local", name: "Funcionário de teste", role: "EMPLOYEE" as const, senha: "funcionario123" },
+          { email: "consulta@local", name: "Consulta de teste", role: "VIEWER" as const, senha: "consulta123" },
+        ]),
   ];
 
   for (const usuario of usuarios) {
@@ -127,7 +147,10 @@ async function semearUsuarios() {
     });
   }
 
-  console.log(`  ${usuarios.length} usuários (admin: ${emailAdmin}).`);
+  console.log(
+    `  ${usuarios.length} usuário(s) (admin: ${emailAdmin})` +
+      (ehProducao ? " — contas de teste omitidas." : "."),
+  );
   return emailAdmin;
 }
 

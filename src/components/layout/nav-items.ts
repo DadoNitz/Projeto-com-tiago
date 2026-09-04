@@ -135,6 +135,13 @@ export const NAVEGACAO: ItemDeNavegacao[] = [
     disponivel: true,
   },
   {
+    titulo: "Usuários",
+    href: "/configuracoes/usuarios",
+    icone: "Users",
+    permissao: "user:manage",
+    disponivel: true,
+  },
+  {
     titulo: "Auditoria",
     href: "/auditoria",
     icone: "ScrollText",
