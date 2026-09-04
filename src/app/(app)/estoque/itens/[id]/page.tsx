@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { FotosDaPeca } from "@/components/inventory/fotos";
 import { GerarAnuncio } from "@/components/inventory/gerar-anuncio";
+import { AdicionarUnidades } from "@/components/inventory/adicionar-unidades";
 import { MovimentarUnidade } from "@/components/inventory/movimentar";
 import { Icone } from "@/components/layout/icon";
 import { ConditionBadge, StatusBadge } from "@/components/shared/status-badge";
@@ -19,6 +20,7 @@ import { can } from "@/lib/auth/permissions";
 import { caminhoDoLocal, listarLocais } from "@/server/services/catalog.service";
 import { NaoEncontradoError } from "@/server/services/errors";
 import { buscarUnidade } from "@/server/services/inventory.service";
+import { listarSocios } from "@/server/services/partner.service";
 import { requireContext } from "@/server/session";
 import { cn } from "@/lib/utils";
 
@@ -61,7 +63,11 @@ export default async function UnidadePage({
     throw erro;
   }
 
-  const [locais, ctx] = await Promise.all([listarLocais(), requireContext()]);
+  const [locais, socios, ctx] = await Promise.all([
+    listarLocais(),
+    listarSocios(),
+    requireContext(),
+  ]);
   const caminho = caminhoDoLocal(locais, unidade.locationId);
   const podeMovimentar = can(ctx.role, "movement:create");
   // O botao so aparece quando ha chave configurada: oferecer o que vai falhar
@@ -130,6 +136,25 @@ export default async function UnidadePage({
                 <Pencil className="size-4" aria-hidden />
                 Editar
               </Link>
+            ) : null}
+            {can(ctx.role, "inventory:write") ? (
+              <AdicionarUnidades
+                productId={unidade.product.id}
+                nomeDoProduto={unidade.product.name}
+                porQuantidade={unidade.product.trackingMode === "QUANTITY"}
+                localAtual={unidade.locationId ?? undefined}
+                custoSugerido={
+                  unidade.purchaseCost ? String(unidade.purchaseCost) : undefined
+                }
+                locais={locais.map((local) => ({
+                  id: local.id,
+                  name: local.name,
+                }))}
+                socios={socios.map((socio) => ({
+                  id: socio.id,
+                  name: socio.name,
+                }))}
+              />
             ) : null}
             {podeMovimentar ? (
               <MovimentarUnidade

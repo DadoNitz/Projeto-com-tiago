@@ -134,6 +134,15 @@ export const NAVEGACAO: ItemDeNavegacao[] = [
     permissao: "catalog:write",
     disponivel: true,
   },
+  {
+    titulo: "Auditoria",
+    href: "/auditoria",
+    icone: "ScrollText",
+    // So o administrador. Funcionario ve o proprio trabalho pelo historico da
+    // peca; a trilha completa e ferramenta de conferencia, nao de operacao.
+    permissao: "audit:read",
+    disponivel: true,
+  },
 ];
 
 /**

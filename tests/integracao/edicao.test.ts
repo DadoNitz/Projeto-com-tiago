@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import {
+  camposAlterados,
+  listarTrilha,
+} from "@/server/services/audit-read.service";
 import { prisma } from "@/server/db/client";
 import {
   ConflitoError,
@@ -268,5 +272,52 @@ describe("exclusão lógica", () => {
     await expect(
       excluirUnidade(unitIds[0]!, undefined, ctx),
     ).rejects.toBeInstanceOf(EstoqueInvalidoError);
+  });
+});
+
+describe("trilha de auditoria", () => {
+  it("registra quem alterou, o que mudou e quando", async () => {
+    // A trilha so cumpre a secao 17 se for legivel depois. Este teste percorre
+    // o caminho inteiro: alterar -> gravar -> ler -> comparar.
+    const { unitIds } = await criarPeca();
+
+    await atualizarUnidade(
+      unitIds[0]!,
+      { condition: "NEW", serialNumber: "AUD-0001", purchaseCost: 999 },
+      ctx,
+    );
+
+    const { eventos } = await listarTrilha({
+      entity: "InventoryUnit",
+      entityId: unitIds[0]!,
+    });
+
+    const alteracao = eventos.find((evento) => evento.action === "update");
+    expect(alteracao).toBeDefined();
+    expect(alteracao?.user?.id).toBe(ctx.userId);
+
+    const mudancas = camposAlterados(alteracao?.before, alteracao?.after);
+    const campos = mudancas.map((mudanca) => mudanca.campo);
+
+    expect(campos).toContain("condition");
+    expect(campos).toContain("serialNumber");
+
+    const condicao = mudancas.find((m) => m.campo === "condition");
+    expect(condicao?.de).toBe("USED");
+    expect(condicao?.para).toBe("NEW");
+  });
+
+  it("a exclusao logica tambem deixa rastro", async () => {
+    const { unitIds } = await criarPeca();
+    await excluirUnidade(unitIds[0]!, "duplicado", ctx);
+
+    const { eventos } = await listarTrilha({
+      entity: "InventoryUnit",
+      entityId: unitIds[0]!,
+      action: "delete",
+    });
+
+    expect(eventos.length).toBeGreaterThan(0);
+    expect((eventos[0]?.after as { motivo?: string })?.motivo).toBe("duplicado");
   });
 });

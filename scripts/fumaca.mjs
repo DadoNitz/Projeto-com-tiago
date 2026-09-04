@@ -132,6 +132,7 @@ const rotas = [
   "/relatorios?periodo=ano",
   "/promocoes",
   "/configuracoes",
+  "/auditoria",
   "/mais",
   "/api/health",
 ];

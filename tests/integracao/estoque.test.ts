@@ -2,7 +2,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@/server/db/client";
 import { registrarMovimento } from "@/server/services/movement.service";
-import { cadastrarPecaComUnidades } from "@/server/services/product.service";
+import {
+  adicionarUnidades,
+  cadastrarPecaComUnidades,
+} from "@/server/services/product.service";
 import { EstoqueInvalidoError } from "@/server/services/errors";
 import type { ActionContext } from "@/server/session";
 
@@ -343,5 +346,75 @@ describe("invariantes do banco", () => {
         unitIds[0]!,
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe("adicionar unidades a um produto existente", () => {
+  it("reaproveita o modelo sem redigitar especificacao", async () => {
+    // O caso da secao 23: "comprei mais tres dessas". A ficha tecnica mora no
+    // produto, entao as novas unidades ja nascem com ela.
+    const primeira = await criarPecaSerializada(1, 100);
+
+    const produto = await prisma.product.findUniqueOrThrow({
+      where: { id: primeira.productId },
+      select: { specs: true },
+    });
+
+    const extras = await adicionarUnidades(
+      primeira.productId,
+      {
+        quantidade: 3,
+        seriais: ["EXTRA-1", "EXTRA-2"],
+        condition: "NEW",
+        purchaseCost: 120,
+        purchasedById: partnerId,
+      },
+      ctx,
+    );
+
+    expect(extras.unitIds).toHaveLength(3);
+    expect(extras.productId).toBe(primeira.productId);
+
+    const unidades = await prisma.inventoryUnit.findMany({
+      where: { productId: primeira.productId },
+      select: {
+        serialNumber: true,
+        condition: true,
+        product: { select: { specs: true } },
+      },
+    });
+
+    expect(unidades).toHaveLength(4);
+    // Todas veem a mesma ficha tecnica, sem nenhuma escrita de spec.
+    for (const unidade of unidades) {
+      expect(unidade.product.specs).toEqual(produto.specs);
+    }
+
+    // Os dois seriais informados foram usados; a terceira unidade ficou sem,
+    // em vez de receber um numero inventado.
+    const seriais = unidades.map((u) => u.serialNumber).filter(Boolean);
+    expect(seriais).toContain("EXTRA-1");
+    expect(seriais).toContain("EXTRA-2");
+  });
+
+  it("cada unidade nova recebe codigo interno unico e movimentacao de entrada", async () => {
+    const base = await criarPecaSerializada(1);
+    const extras = await adicionarUnidades(
+      base.productId,
+      { quantidade: 2, seriais: [], condition: "USED", purchaseCost: 50 },
+      ctx,
+    );
+
+    expect(new Set(extras.codigos).size).toBe(2);
+
+    const movimentos = await prisma.inventoryMovement.findMany({
+      where: { unitId: { in: extras.unitIds } },
+      select: { type: true, toStatus: true, amount: true },
+    });
+
+    expect(movimentos).toHaveLength(2);
+    expect(movimentos.every((m) => m.type === "INBOUND")).toBe(true);
+    expect(movimentos.every((m) => m.toStatus === "AVAILABLE")).toBe(true);
+    expect(movimentos.every((m) => Number(m.amount) === 50)).toBe(true);
   });
 });
