@@ -55,7 +55,6 @@ export interface UnidadeSeed {
 export const SOCIOS = [
   { slug: "dado", nome: "Dado", usuario: "ADMIN" as const },
   { slug: "tiago", nome: "Tiago", usuario: null },
-  { slug: "eduardo", nome: "Eduardo", usuario: null },
 ] as const;
 
 export const MARCAS = [
@@ -119,7 +118,7 @@ export const PRODUTOS: ProdutoSeed[] = [
       includesCooler: true,
     },
     unidades: [
-      { serial: "9NF4821K3729", condition: "USED", local: "Prateleira A1", custo: 430, origem: "Compra de lote", comprador: "eduardo" },
+      { serial: "9NF4821K3729", condition: "USED", local: "Prateleira A1", custo: 430, origem: "Compra de lote", comprador: "dado" },
       { serial: "9NF4821K9174", condition: "NEW", local: "Prateleira A1", custo: 510, origem: "Fornecedor" },
     ],
   },
@@ -377,8 +376,8 @@ export const PRODUTOS: ProdutoSeed[] = [
       interface: "PCIe 4.0 x16",
     },
     unidades: [
-      { serial: "MS3060V3729", condition: "USED", local: "Prateleira A2", custo: 1100, comprador: "eduardo" },
-      { serial: "MS3060V9132", condition: "NEW", local: "Vitrine", custo: 1290, venda: 1590, comprador: "eduardo" },
+      { serial: "MS3060V3729", condition: "USED", local: "Prateleira A2", custo: 1100, comprador: "dado" },
+      { serial: "MS3060V9132", condition: "NEW", local: "Vitrine", custo: 1290, venda: 1590, comprador: "dado" },
     ],
     tags: ["gamer"],
   },

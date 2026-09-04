@@ -11,7 +11,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -108,12 +107,20 @@ export function Topbar({
           </span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>
+          {/*
+            Cabecalho comum, e nao `DropdownMenuLabel`.
+
+            Aquele componente e um `Menu.GroupLabel` do Base UI, que LANCA
+            excecao quando nao ha um `<Menu.Group>` acima — e derrubava o menu
+            inteiro no clique, deixando a pessoa sem conseguir sair.
+
+            Alem disso ele estaria errado no lugar: este bloco diz quem voce e,
+            nao rotula um grupo de comandos.
+          */}
+          <div className="px-1.5 py-1">
             <p className="truncate text-sm font-medium">{nome}</p>
-            <p className="text-muted-foreground text-xs font-normal">
-              {ROLE_LABELS[role]}
-            </p>
-          </DropdownMenuLabel>
+            <p className="text-muted-foreground text-xs">{ROLE_LABELS[role]}</p>
+          </div>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={sair} disabled={saindo}>
             <LogOut className="size-4" aria-hidden />
