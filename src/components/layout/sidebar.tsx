@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -30,6 +31,29 @@ export function Sidebar({ role }: { role: Role }) {
           </p>
         </div>
       </div>
+
+      {/*
+        Ação principal, sempre visível.
+
+        Os itens filhos do menu só aparecem com a seção aberta, então
+        "Estoque > Adicionar peça" ficava a dois cliques de qualquer outra
+        tela. No celular esse papel é da barra inferior; aqui ele precisava de
+        um lugar próprio.
+
+        Some na própria tela de cadastro, onde seria um convite a recomeçar o
+        que já se está fazendo.
+      */}
+      {can(role, "inventory:write") && !pathname.startsWith("/estoque/novo") ? (
+        <div className="px-3 pt-3">
+          <Link
+            href="/estoque/novo"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring flex h-10 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <Plus className="size-4" aria-hidden />
+            Adicionar peça
+          </Link>
+        </div>
+      ) : null}
 
       <nav className="flex-1 overflow-y-auto p-3" aria-label="Navegação principal">
         <ul className="space-y-1">
