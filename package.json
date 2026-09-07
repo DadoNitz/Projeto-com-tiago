@@ -21,7 +21,9 @@
     "smoke": "node --env-file=.env scripts/fumaca.mjs",
     "cron:check": "node --env-file=.env scripts/testar-cron.mjs",
     "limpar-demo": "tsx scripts/limpar-demonstracao.ts",
-    "usuario": "tsx scripts/criar-usuario.ts"
+    "usuario": "tsx scripts/criar-usuario.ts",
+    "backup": "tsx scripts/backup.ts",
+    "restaurar": "tsx scripts/restaurar.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

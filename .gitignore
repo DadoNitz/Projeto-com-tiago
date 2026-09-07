@@ -48,3 +48,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Backups: contem hashes de senha e todos os dados do negocio.
+backups/

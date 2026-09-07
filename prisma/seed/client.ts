@@ -3,6 +3,7 @@ import path from "node:path";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient } from "../../src/generated/prisma/client";
+import { retryExtension } from "../../src/server/db/retry";
 import { lerSchema, normalizarUrlPostgres } from "../../src/server/db/connection-url";
 
 /**
@@ -42,4 +43,12 @@ const adapter = new PrismaPg(
   { schema: lerSchema(url) },
 );
 
-export const prisma = new PrismaClient({ adapter });
+/*
+ * Mesma extensao de retry do aplicativo.
+ *
+ * O Neon suspende o compute quando ocioso, e a primeira consulta depois disso
+ * falha. Sem o retry, todo script de linha de comando — backup inclusive —
+ * quebrava na primeira tentativa e so funcionava se a pessoa rodasse de novo.
+ * Um backup que depende de rodar duas vezes nao e confiavel.
+ */
+export const prisma = new PrismaClient({ adapter }).$extends(retryExtension);
