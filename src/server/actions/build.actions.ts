@@ -43,6 +43,9 @@ const criarSchema = z.object({
   tier: z.string().trim().max(40).optional(),
   notes: z.string().trim().max(2000).optional(),
   unitIds: z.array(z.string().min(1)).min(1, "Selecione ao menos uma peca."),
+  // Lista fechada: so estes dois estados fazem sentido no nascimento de uma
+  // montagem. Aceitar o enum inteiro deixaria criar uma ja "vendida".
+  status: z.enum(["RESERVED", "ASSEMBLED"]).optional(),
   compatibilidade: z.unknown().optional(),
 });
 
@@ -63,6 +66,7 @@ export async function salvarMontagem(
             tier: dados.tier,
             notes: dados.notes,
             unitIds: dados.unitIds,
+            status: dados.status,
             compatibilidade: dados.compatibilidade,
           },
           ctx,

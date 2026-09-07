@@ -44,6 +44,54 @@ interface CategoriaComSpecs extends Opcao {
  * frente da bancada. Um formulário de 30 campos numa tela de 6 polegadas faz
  * perder o lugar a cada rolagem.
  */
+/**
+ * Em que passo mora cada campo, e como ele se chama na tela.
+ *
+ * Existe porque o formulário tem passos: um erro em "categoria" acontece no
+ * passo 1 e a pessoa costuma estar no passo 4 quando aperta Cadastrar. Sem
+ * levar a tela até o campo, a mensagem manda procurar algo que está fora da
+ * vista — que foi exatamente o que acontecia.
+ */
+const CAMPOS: Record<string, { passo: number; rotulo: string }> = {
+  "produto.categoryId": { passo: 0, rotulo: "Categoria" },
+  "produto.name": { passo: 1, rotulo: "Nome da peça" },
+  "produto.model": { passo: 1, rotulo: "Modelo" },
+  "produto.partNumber": { passo: 1, rotulo: "Part number" },
+  "produto.brandId": { passo: 1, rotulo: "Marca" },
+  "produto.trackingMode": { passo: 1, rotulo: "Controle" },
+  "unidades.quantidade": { passo: 2, rotulo: "Quantidade" },
+  "unidades.seriais": { passo: 2, rotulo: "Números de série" },
+  "unidades.condition": { passo: 2, rotulo: "Condição" },
+  "unidades.locationId": { passo: 2, rotulo: "Local" },
+  "unidades.purchasedById": { passo: 2, rotulo: "Quem comprou" },
+  "unidades.purchaseCost": { passo: 2, rotulo: "Custo de compra" },
+  "unidades.estimatedSalePrice": { passo: 2, rotulo: "Preço de venda" },
+  "unidades.origin": { passo: 2, rotulo: "Procedência" },
+  "unidades.notes": { passo: 2, rotulo: "Observações" },
+};
+
+/** Onde está o campo, incluindo os que só existem na categoria escolhida. */
+function localizarCampo(
+  caminho: string,
+  rotulosDeSpec: Record<string, string>,
+): { passo: number; rotulo: string } {
+  const conhecido = CAMPOS[caminho];
+  if (conhecido) return conhecido;
+
+  // Especificações são dinâmicas: dependem da categoria, então não cabem num
+  // mapa fixo. O rótulo vem do próprio catálogo daquela categoria.
+  if (caminho.startsWith("produto.specs.")) {
+    const chave = caminho.slice("produto.specs.".length).split(".")[0]!;
+    return { passo: 3, rotulo: rotulosDeSpec[chave] ?? chave };
+  }
+
+  // Caminho com índice ("unidades.seriais.2") cai no campo de origem.
+  const raiz = caminho.split(".").slice(0, 2).join(".");
+  if (CAMPOS[raiz]) return CAMPOS[raiz]!;
+
+  return { passo: 0, rotulo: caminho };
+}
+
 export function FormularioDeCadastro({
   categorias,
   marcas,
@@ -90,6 +138,16 @@ export function FormularioDeCadastro({
     () => categorias.find((item) => item.id === categoryId),
     [categorias, categoryId],
   );
+
+  // Rótulo de cada especificação da categoria escolhida, para a mensagem de
+  // erro poder dizer "VRAM (GB)" em vez de "vram".
+  const rotulosDeSpec = useMemo(() => {
+    const mapa: Record<string, string> = {};
+    for (const definicao of categoria?.specs ?? []) {
+      mapa[definicao.key] = definicao.label;
+    }
+    return mapa;
+  }, [categoria]);
 
   const seriais = useMemo(
     () =>
@@ -150,6 +208,18 @@ export function FormularioDeCadastro({
     [marcas],
   );
 
+  /** Erros em forma de lista, já com passo e rótulo resolvidos. */
+  const listaDeErros = useMemo(
+    () =>
+      Object.entries(erros).flatMap(([caminho, mensagens]) => {
+        const primeira = mensagens?.[0];
+        if (!primeira) return [];
+        const { passo: onde, rotulo } = localizarCampo(caminho, rotulosDeSpec);
+        return [{ caminho, passo: onde, rotulo, mensagem: primeira }];
+      }),
+    [erros, rotulosDeSpec],
+  );
+
   const passos = [
     { titulo: "Categoria", valido: Boolean(categoryId) },
     { titulo: "Identificação", valido: nome.trim().length >= 2 },
@@ -198,9 +268,29 @@ export function FormularioDeCadastro({
       });
 
       if (!resultado.ok) {
-        setErros(resultado.fieldErrors ?? {});
+        const camposComErro = resultado.fieldErrors ?? {};
+        setErros(camposComErro);
+
+        const caminhos = Object.keys(camposComErro).filter(
+          (caminho) => (camposComErro[caminho]?.length ?? 0) > 0,
+        );
+
+        const localizados = caminhos.map((caminho) =>
+          localizarCampo(caminho, rotulosDeSpec),
+        );
+
+        // Vai para o primeiro passo com problema. Sem isto a mensagem manda
+        // conferir um campo que pode estar em outra aba, fora da vista.
+        if (localizados.length > 0) {
+          const primeiro = Math.min(...localizados.map((campo) => campo.passo));
+          setPasso(primeiro);
+        }
+
         toast.error("Não foi possível cadastrar", {
-          description: resultado.error,
+          description:
+            localizados.length > 0
+              ? `${localizados.map((campo) => campo.rotulo).join(", ")}: ${resultado.error}`
+              : resultado.error,
         });
         return;
       }
@@ -243,6 +333,39 @@ export function FormularioDeCadastro({
           </li>
         ))}
       </ol>
+
+      {/*
+        Resumo dos erros, com o passo de cada um e um atalho para chegar la.
+        Existe como rede de seguranca: mesmo que um campo novo nao tenha
+        destaque proprio, ou nao esteja no mapa CAMPOS, o problema aparece
+        aqui em vez de a tela mandar procurar algo invisivel.
+      */}
+      {listaDeErros.length > 0 ? (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm dark:border-red-900 dark:bg-red-950/50"
+        >
+          <p className="font-medium text-red-800 dark:text-red-300">
+            {listaDeErros.length === 1
+              ? "Um campo precisa de atenção:"
+              : `${listaDeErros.length} campos precisam de atenção:`}
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            {listaDeErros.map((erro) => (
+              <li key={erro.caminho}>
+                <button
+                  type="button"
+                  onClick={() => setPasso(erro.passo)}
+                  className="text-left text-red-700 underline underline-offset-2 hover:text-red-900 dark:text-red-300 dark:hover:text-red-100"
+                >
+                  <strong>{erro.rotulo}</strong> ({passos[erro.passo]?.titulo}):{" "}
+                  {erro.mensagem}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="bg-card rounded-lg border p-4">
         {passo === 0 ? (

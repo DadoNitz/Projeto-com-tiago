@@ -1,4 +1,4 @@
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, Cpu, Pencil } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -69,6 +69,9 @@ export default async function UnidadePage({
     requireContext(),
   ]);
   const caminho = caminhoDoLocal(locais, unidade.locationId);
+  // A consulta ja filtra montagem cancelada e apagada; aqui e so o primeiro
+  // (e unico) vinculo ativo.
+  const montagem = unidade.buildItems[0] ?? null;
   const podeMovimentar = can(ctx.role, "movement:create");
   // O botao so aparece quando ha chave configurada: oferecer o que vai falhar
   // ao clicar e pior do que nao oferecer.
@@ -113,6 +116,26 @@ export default async function UnidadePage({
               <StatusBadge status={unidade.status} />
               <ConditionBadge condition={unidade.condition} />
             </div>
+
+            {/*
+              Em qual PC a peca esta. "Em montagem" sozinho nao responde a
+              pergunta de quem esta com a peca na mao — e sem o link, descobrir
+              exigia abrir montagem por montagem.
+            */}
+            {montagem ? (
+              <Link
+                href={`/montagens/minhas#${montagem.build.id}`}
+                className="mt-2 inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 hover:bg-sky-100 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-200 dark:hover:bg-sky-900"
+              >
+                <Cpu className="size-4 shrink-0" aria-hidden />
+                <span>
+                  Montada em <strong>{montagem.build.name}</strong>
+                  {montagem.build.customerName
+                    ? ` · ${montagem.build.customerName}`
+                    : ""}
+                </span>
+              </Link>
+            ) : null}
           </div>
         </div>
 

@@ -54,6 +54,18 @@ export interface CriarMontagemInput {
   tier?: string | undefined;
   /** Unidades que compõem a montagem. */
   unitIds: string[];
+  /**
+   * Situação em que a montagem nasce.
+   *
+   * `RESERVED` é o padrão e serve ao fluxo de sugestões: as peças ficam
+   * separadas para um PC que ainda vai ser montado.
+   *
+   * `ASSEMBLED` existe para o caminho oposto, e mais comum na bancada: o PC
+   * **já foi montado** e só falta o estoque saber. Nascer como reservada
+   * obrigaria a mudar o status logo em seguida — um passo a mais que registra
+   * um estado que nunca existiu.
+   */
+  status?: "RESERVED" | "ASSEMBLED" | undefined;
   /** Resultado do motor no momento da criação, guardado como evidência. */
   compatibilidade?: unknown;
 }
@@ -118,7 +130,7 @@ export async function criarMontagem(
       data: {
         name: input.name,
         customerName: input.customerName ?? null,
-        status: "RESERVED",
+        status: input.status ?? "RESERVED",
         totalCost: custoTotal,
         salePrice: input.salePrice ?? null,
         useCase: input.useCase ?? null,

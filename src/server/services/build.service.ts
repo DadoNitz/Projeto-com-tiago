@@ -181,3 +181,69 @@ export async function montarPainelDeSugestoes(
     ],
   };
 }
+
+/** Uma peça disponível, do jeito que a tela de montagem manual precisa. */
+export interface PecaParaMontar {
+  id: string;
+  codigo: string;
+  nome: string;
+  categorySlug: string;
+  specs: SpecRecord;
+  custo: number | null;
+  precoSugerido: number | null;
+  local: string | null;
+}
+
+/**
+ * Lista as peças disponíveis para montar escolhendo à mão.
+ *
+ * Difere de `carregarEstoqueParaMontagem` em dois pontos que importam:
+ *
+ * - devolve lista plana com código interno, custo e localização, porque quem
+ *   monta na bancada procura pela etiqueta e pela prateleira, não pelo id;
+ * - inclui TODAS as categorias, não só as oito que o motor sabe avaliar.
+ *   Um PC montado leva monitor, teclado, cabo — e uma montagem que não
+ *   consegue registrar o que realmente saiu do estoque deixa o estoque
+ *   mentindo, que é pior do que não avaliar a compatibilidade daquela peça.
+ *
+ * Só `AVAILABLE`: peça já reservada para outra montagem não deve aparecer
+ * como se estivesse livre.
+ */
+export async function listarPecasParaMontar(): Promise<PecaParaMontar[]> {
+  const unidades = await prisma.inventoryUnit.findMany({
+    where: { status: "AVAILABLE", deletedAt: null },
+    orderBy: [{ product: { category: { name: "asc" } } }, { entryDate: "desc" }],
+    select: {
+      id: true,
+      internalCode: true,
+      purchaseCost: true,
+      estimatedSalePrice: true,
+      location: { select: { name: true } },
+      product: {
+        select: {
+          name: true,
+          specs: true,
+          brand: { select: { name: true } },
+          category: { select: { slug: true } },
+        },
+      },
+    },
+  });
+
+  return unidades.map((unidade) => {
+    const marca = unidade.product.brand?.name;
+    return {
+      // O id e o da UNIDADE: a montagem consome uma peca fisica especifica.
+      id: unidade.id,
+      codigo: unidade.internalCode,
+      nome: marca ? `${marca} ${unidade.product.name}` : unidade.product.name,
+      categorySlug: unidade.product.category.slug,
+      specs: (unidade.product.specs ?? {}) as SpecRecord,
+      custo: unidade.purchaseCost ? Number(unidade.purchaseCost) : null,
+      precoSugerido: unidade.estimatedSalePrice
+        ? Number(unidade.estimatedSalePrice)
+        : null,
+      local: unidade.location?.name ?? null,
+    };
+  });
+}

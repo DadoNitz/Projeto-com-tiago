@@ -1,4 +1,4 @@
-import { AlertTriangle, Cpu, TriangleAlert } from "lucide-react";
+import { AlertTriangle, Cpu, TriangleAlert, Wrench } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -53,12 +53,27 @@ export default async function MontagensPage() {
             usa peças diferentes — todas podem ser montadas ao mesmo tempo.
           </p>
         </div>
-        <Link
-          href="/montagens/minhas"
-          className="text-muted-foreground hover:text-foreground text-sm underline"
-        >
-          Minhas montagens
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          {/*
+            A tela abaixo sugere combinacoes. Esta leva ao caminho oposto e
+            mais frequente: o PC ja foi montado e falta o estoque saber.
+          */}
+          {podeVerificar ? (
+            <Link
+              href="/montagens/nova"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-11 items-center gap-2 rounded-lg px-4 text-sm font-medium"
+            >
+              <Wrench className="size-4" aria-hidden />
+              Montar escolhendo as peças
+            </Link>
+          ) : null}
+          <Link
+            href="/montagens/minhas"
+            className="text-muted-foreground hover:text-foreground text-sm underline"
+          >
+            Minhas montagens
+          </Link>
+        </div>
       </div>
 
       <section

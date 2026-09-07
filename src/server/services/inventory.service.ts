@@ -199,6 +199,22 @@ export async function buscarUnidade(id: string) {
           _count: { select: { units: true } },
         },
       },
+      // Em qual montagem esta peca esta. Sem isto o estoque diz apenas "Em
+      // montagem", e descobrir em QUAL PC exige abrir montagem por montagem —
+      // que e justamente a pergunta de quem esta com a peca na mao.
+      //
+      // Filtra montagem cancelada e apagada: BuildItem sobrevive ao cancelamento
+      // como historico, e apontar para uma montagem cancelada diria que a peca
+      // esta presa quando ela ja voltou para a prateleira.
+      buildItems: {
+        where: { build: { deletedAt: null, status: { not: "CANCELLED" } } },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          role: true,
+          build: { select: { id: true, name: true, status: true, customerName: true } },
+        },
+      },
       movements: {
         orderBy: { createdAt: "desc" },
         take: 50,

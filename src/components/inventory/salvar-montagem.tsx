@@ -33,6 +33,7 @@ export function SalvarMontagem({
   useCase,
   valorSugerido,
   incompativel,
+  jaMontado = false,
 }: {
   unitIds: string[];
   nomeSugerido: string;
@@ -41,6 +42,14 @@ export function SalvarMontagem({
   valorSugerido: number;
   /** Quando o motor reprovou a configuração, o botão avisa antes de deixar salvar. */
   incompativel: boolean;
+  /**
+   * O PC já existe montado, e o registro só está alcançando a realidade.
+   *
+   * Muda o texto e o estado inicial: "reservar" descreve peças separadas para
+   * um PC futuro, e usar essa palavra para uma máquina que já está ligada na
+   * bancada faria a tela descrever uma situação que não é a verdadeira.
+   */
+  jaMontado?: boolean;
 }) {
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
@@ -70,6 +79,7 @@ export function SalvarMontagem({
         tier,
         useCase,
         unitIds,
+        status: jaMontado ? "ASSEMBLED" : "RESERVED",
       });
 
       if (!resultado.ok) {
@@ -77,7 +87,7 @@ export function SalvarMontagem({
         return;
       }
 
-      toast.success("Montagem reservada", {
+      toast.success(jaMontado ? "Montagem registrada" : "Montagem reservada", {
         description: `${resultado.data.pecasAlocadas} peças saíram do estoque disponível e voltam se você cancelar.`,
       });
       setAberto(false);
@@ -89,15 +99,20 @@ export function SalvarMontagem({
     <Dialog open={aberto} onOpenChange={setAberto}>
       <DialogTrigger render={<Button variant="outline" className="h-10" />}>
         <Save className="size-4" aria-hidden />
-        Reservar esta montagem
+        {jaMontado ? "Salvar montagem" : "Reservar esta montagem"}
       </DialogTrigger>
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Reservar montagem</DialogTitle>
+          <DialogTitle>
+            {jaMontado ? "Salvar montagem" : "Reservar montagem"}
+          </DialogTitle>
           <DialogDescription>
-            As {unitIds.length} peças ficam reservadas e saem do estoque
-            disponível. Cancelar a montagem devolve todas.
+            {jaMontado
+              ? `As ${unitIds.length} peças passam para "em montagem" e cada uma
+                 passa a mostrar em qual PC está. Cancelar devolve todas.`
+              : `As ${unitIds.length} peças ficam reservadas e saem do estoque
+                 disponível. Cancelar a montagem devolve todas.`}
           </DialogDescription>
         </DialogHeader>
 

@@ -148,6 +148,52 @@ describe("criar montagem", () => {
     expect(Number(build.totalCost)).toBe(300);
   });
 
+  it("nasce como ASSEMBLED quando o PC já foi montado", async () => {
+    // A tela de montagem manual existe para o caso em que a máquina já está
+    // pronta na bancada. Nascer "reservada" obrigaria a mudar o status logo em
+    // seguida, registrando um estado que nunca existiu — e, entre os dois
+    // passos, a montagem apareceria como planejada quando já estava montada.
+    const unidades = await criarPecas(2);
+
+    const { buildId } = await criarMontagem(
+      { name: `${MARCADOR} ja montado`, unitIds: unidades, status: "ASSEMBLED" },
+      ctx,
+    );
+
+    const build = await prisma.build.findUniqueOrThrow({
+      where: { id: buildId },
+      select: { status: true },
+    });
+    expect(build.status).toBe("ASSEMBLED");
+
+    // O que importa para o estoque é o mesmo dos dois jeitos: as peças saem do
+    // disponível. É esta parte que faz o estoque parar de mentir.
+    for (const unitId of unidades) {
+      expect((await statusDe(unitId)).status).toBe("IN_BUILD");
+    }
+  });
+
+  it("a peça montada aponta de volta para a montagem", async () => {
+    // É o que a tela da peça mostra: "Montada em <nome>". Sem este vínculo, o
+    // estoque diz apenas "em montagem" e descobrir em QUAL PC exigiria abrir
+    // montagem por montagem.
+    const unidades = await criarPecas(1);
+    const unitId = unidades[0]!;
+
+    const { buildId } = await criarMontagem(
+      { name: `${MARCADOR} com vinculo`, unitIds: unidades, status: "ASSEMBLED" },
+      ctx,
+    );
+
+    const vinculo = await prisma.buildItem.findFirstOrThrow({
+      where: { unitId, build: { deletedAt: null, status: { not: "CANCELLED" } } },
+      select: { build: { select: { id: true, name: true } } },
+    });
+
+    expect(vinculo.build.id).toBe(buildId);
+    expect(vinculo.build.name).toContain("com vinculo");
+  });
+
   it("registra movimentação de alocação para cada peça", async () => {
     const unidades = await criarPecas(2);
     const { buildId } = await criarMontagem(

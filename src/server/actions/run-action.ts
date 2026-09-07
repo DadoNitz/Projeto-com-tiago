@@ -64,8 +64,8 @@ export async function runAction<TSchema extends z.ZodType, TOutput>(
 
     const parsed = options.schema.safeParse(input);
     if (!parsed.success) {
-      const { fieldErrors } = z.flattenError(parsed.error);
-      return fail("Verifique os campos destacados.", fieldErrors);
+      const fieldErrors = errosPorCaminho(parsed.error);
+      return fail(mensagemDeValidacao(fieldErrors), fieldErrors);
     }
 
     const data = await options.handler(parsed.data, ctx);
@@ -73,6 +73,51 @@ export async function runAction<TSchema extends z.ZodType, TOutput>(
   } catch (erro) {
     return fail(mensagemDeErro(erro));
   }
+}
+
+/**
+ * Erros por caminho completo do campo: `produto.name`, `unidades.seriais.0`.
+ *
+ * Substitui `z.flattenError`, que achata **apenas o primeiro nível**. Com um
+ * schema aninhado — e os deste sistema são, `{ produto, unidades }` — ele
+ * devolvia a chave `produto` com a mensagem genérica do objeto, e nunca o
+ * campo que de fato falhou.
+ *
+ * O efeito no formulário era o pior possível: a tela dizia "verifique os
+ * campos destacados" e não destacava nenhum, porque procurava por
+ * `produto.name` e recebia `produto`. A pessoa ficava sem saber o que
+ * corrigir, ainda mais quando o campo culpado estava em outro passo do
+ * formulário, fora da vista.
+ */
+function errosPorCaminho(erro: z.ZodError): FieldErrors {
+  const mapa: FieldErrors = {};
+
+  for (const issue of erro.issues) {
+    // Caminho vazio = erro do objeto inteiro, não de um campo. Guardado em
+    // "_" para não sumir: é raro, mas some sem deixar rastro se ignorado.
+    const caminho = issue.path.length > 0 ? issue.path.join(".") : "_";
+    (mapa[caminho] ??= []).push(issue.message);
+  }
+
+  return mapa;
+}
+
+/**
+ * Mensagem que já diz o que está errado, em vez de mandar procurar.
+ *
+ * Com um campo só, mostra a mensagem dele — quase sempre é o suficiente para
+ * a pessoa corrigir sem caçar nada.
+ */
+function mensagemDeValidacao(erros: FieldErrors): string {
+  const mensagens = Object.values(erros)
+    .flatMap((lista) => lista ?? [])
+    .filter(Boolean);
+
+  if (mensagens.length === 1) return mensagens[0]!;
+  if (mensagens.length > 1) {
+    return `${mensagens[0]!} (e mais ${mensagens.length - 1} campo(s) com problema)`;
+  }
+  return "Verifique os campos destacados.";
 }
 
 function mensagemDeErro(erro: unknown): string {
