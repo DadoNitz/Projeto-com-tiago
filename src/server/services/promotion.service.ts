@@ -5,7 +5,7 @@ import { z } from "zod";
 import { aiProvider, iaDisponivel } from "@/lib/ai";
 import { prisma } from "@/server/db/client";
 import { formatarMoeda } from "@/lib/format";
-import type { ActionContext } from "@/server/session";
+import type { Ator } from "@/server/ator";
 
 import { registrarAuditoria } from "./audit.service";
 import { NaoEncontradoError } from "./errors";
@@ -49,7 +49,7 @@ function slugificar(texto: string): string {
 
 export async function registrarPromocao(
   dados: DadosDaPromocao,
-  ctx: ActionContext,
+  ctx: Ator,
 ): Promise<{ id: string }> {
   let storeId: string | null = null;
 
@@ -131,7 +131,7 @@ export async function listarPromocoes(apenasAtivas = true) {
 
 export async function arquivarPromocao(
   id: string,
-  ctx: ActionContext,
+  ctx: Ator,
 ): Promise<void> {
   await prisma.promotion.update({ where: { id }, data: { active: false } });
   await registrarAuditoria(
@@ -235,7 +235,7 @@ const INSTRUCAO = [
  */
 export async function avaliarPromocao(
   id: string,
-  ctx: ActionContext,
+  ctx: Ator,
 ): Promise<AvaliacaoDaPromocao> {
   const promocao = await prisma.promotion.findUnique({
     where: { id },

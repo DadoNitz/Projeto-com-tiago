@@ -2,7 +2,7 @@ import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma, type PrismaTransaction } from "@/server/db/client";
-import type { ActionContext } from "@/server/session";
+import type { Ator } from "@/server/ator";
 
 /**
  * Trilha de auditoria (seção 17).
@@ -39,7 +39,7 @@ interface RegistrarAuditoriaInput {
  */
 export async function registrarAuditoria(
   input: RegistrarAuditoriaInput,
-  ctx: ActionContext,
+  ctx: Ator,
   tx: PrismaTransaction | typeof prisma = prisma,
 ): Promise<void> {
   await tx.auditLog.create({
@@ -50,8 +50,10 @@ export async function registrarAuditoria(
       entityId: input.entityId,
       before: input.before ?? undefined,
       after: input.after ?? undefined,
-      ip: ctx.ip,
-      userAgent: ctx.userAgent,
+      // Ação do sistema não tem IP nem navegador; guarda a origem no lugar,
+      // para a trilha dizer o que disparou.
+      ip: "ip" in ctx ? ctx.ip : null,
+      userAgent: "userAgent" in ctx ? ctx.userAgent : ctx.origem,
     },
   });
 }

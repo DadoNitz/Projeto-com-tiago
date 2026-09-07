@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { iaDisponivel } from "@/lib/ai";
 import { can } from "@/lib/auth/permissions";
 import { listarPromocoes } from "@/server/services/promotion.service";
+import { telegramConfigurado } from "@/server/services/telegram.service";
 import { requireContext } from "@/server/session";
 
 import { PainelDePromocoes } from "./painel";
@@ -14,9 +15,10 @@ export const dynamic = "force-dynamic";
 /**
  * Promoções (seção 15).
  *
- * Cadastro manual, sem raspagem de sites — a especificação pede isso, e com
- * razão: raspador quebra a cada mudança de layout e costuma violar termos de
- * uso.
+ * Duas entradas: cadastro manual, e coleta das ofertas encaminhadas para um
+ * grupo de Telegram seu. Nenhuma raspagem de site — a especificação pede
+ * isso, e com razão: raspador quebra a cada mudança de layout e costuma
+ * violar termos de uso. A API do Telegram é oficial e feita para isto.
  *
  * O valor da tela não está em achar a oferta, e sim em julgá-la. E aqui o
  * sistema tem um parâmetro que nenhum site de promoção tem: quanto você já
@@ -35,13 +37,17 @@ export default async function PromocoesPage() {
           Promoções
         </h1>
         <p className="text-muted-foreground text-sm">
-          Registre uma oferta e o sistema compara com o que você já pagou
-          naquela peça — que é o único parâmetro que importa para revender.
+          Encaminhe ofertas para o grupo do bot, ou registre à mão. O sistema
+          compara com o que você já pagou naquela peça — que é o único
+          parâmetro que importa para revender.
         </p>
       </div>
 
       <PainelDePromocoes
         podeAvaliar={can(ctx.role, "ai:use") && iaDisponivel()}
+        podeColetar={
+          can(ctx.role, "ai:use") && iaDisponivel() && telegramConfigurado()
+        }
         promocoes={promocoes.map((promocao) => ({
           id: promocao.id,
           titulo: promocao.title,

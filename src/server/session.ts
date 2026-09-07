@@ -2,23 +2,18 @@ import "server-only";
 
 import { headers } from "next/headers";
 
-import type { Role } from "@/generated/prisma/enums";
 import { auth } from "@/lib/auth";
 import { can, type Permission } from "@/lib/auth/permissions";
 
-/**
- * Contexto de execução de uma operação de escrita.
- *
- * Carrega quem está agindo e de onde — é o que alimenta a auditoria
- * (seção 17) e o campo `userId` das movimentações.
- */
-export interface ActionContext {
-  userId: string;
-  role: Role;
-  name: string;
-  ip: string | null;
-  userAgent: string | null;
-}
+// Reexportado para não quebrar quem já importa daqui. As definições moram em
+// `ator.ts` porque não dependem de autenticação — ver a nota lá.
+export {
+  contextoDoSistema,
+  type ActionContext,
+  type Ator,
+  type ContextoDoSistema,
+} from "./ator";
+import type { ActionContext } from "./ator";
 
 export class NaoAutenticadoError extends Error {
   constructor() {

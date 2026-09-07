@@ -737,6 +737,23 @@ model PushSubscription {
   @@map("push_subscriptions")
 }
 
+/// Configuracao interna do sistema, em pares chave/valor.
+///
+/// Criada para guardar o ponto de leitura do Telegram: a API entrega
+/// atualizacoes a partir de um `offset`, e sem lembrar onde parou o sistema
+/// releria as mesmas mensagens a cada ciclo — gastando cota de IA para
+/// reprocessar oferta ja registrada.
+///
+/// Nao e para configuracao de negocio, que pertence a tabelas proprias. E
+/// para estado operacional que precisa sobreviver a um reinicio.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
 // ---------------------------------------------------------------------------
 // Auditoria (Fase 1)
 // ---------------------------------------------------------------------------

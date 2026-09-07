@@ -10,6 +10,13 @@ import {
   type AvaliacaoDaPromocao,
 } from "@/server/services/promotion.service";
 
+import {
+  coletarPromocoes,
+  telegramConfigurado,
+  MAXIMO_MANUAL,
+  type ResultadoDaColeta,
+} from "@/server/services/telegram.service";
+
 import { runAction, type ActionResult } from "./run-action";
 
 /** Server Actions de promocoes. */
@@ -97,6 +104,38 @@ export async function arquivar(input: unknown): Promise<ActionResult<null>> {
       },
     },
     input,
+  );
+
+  if (resultado.ok) revalidatePath("/promocoes");
+  return resultado;
+}
+
+/**
+ * Puxa agora as ofertas encaminhadas para o grupo do Telegram.
+ *
+ * Existe apesar do agendamento porque oferta boa nao espera: quem acabou de
+ * encaminhar quer ver aparecer. O `offset` guardado no banco faz as duas vias
+ * conviverem — o que a coleta manual processou, o agendamento nao rele.
+ *
+ * Exige `ai:use` porque cada mensagem que passa do pre-filtro gasta cota.
+ */
+export async function coletarDoTelegram(): Promise<
+  ActionResult<ResultadoDaColeta>
+> {
+  const resultado = await runAction(
+    {
+      permission: "ai:use",
+      schema: z.object({}).optional(),
+      async handler() {
+        if (!telegramConfigurado()) {
+          throw new Error(
+            "Telegram nao configurado. Falta definir TELEGRAM_BOT_TOKEN.",
+          );
+        }
+        return coletarPromocoes({ teto: MAXIMO_MANUAL });
+      },
+    },
+    {},
   );
 
   if (resultado.ok) revalidatePath("/promocoes");

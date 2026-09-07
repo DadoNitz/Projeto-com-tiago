@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Loader2, Plus, Sparkles, Tag } from "lucide-react";
+import { Archive, Download, Loader2, Plus, Sparkles, Tag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -9,7 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatarData, formatarMoeda } from "@/lib/format";
-import { arquivar, avaliar, novaPromocao } from "@/server/actions/promotion.actions";
+import {
+  arquivar,
+  avaliar,
+  coletarDoTelegram,
+  novaPromocao,
+} from "@/server/actions/promotion.actions";
 import { cn } from "@/lib/utils";
 
 export interface PromocaoNaTela {
@@ -44,14 +49,18 @@ interface Referencia {
 export function PainelDePromocoes({
   promocoes,
   podeAvaliar,
+  podeColetar,
 }: {
   promocoes: PromocaoNaTela[];
   podeAvaliar: boolean;
+  /** Só quando há bot configurado e a pessoa pode gastar cota de IA. */
+  podeColetar: boolean;
 }) {
   const router = useRouter();
   const [mostrarForm, setMostrarForm] = useState(promocoes.length === 0);
   const [executando, iniciar] = useTransition();
   const [avaliando, setAvaliando] = useState<string | null>(null);
+  const [coletando, setColetando] = useState(false);
   const [referencias, setReferencias] = useState<Record<string, Referencia[]>>({});
 
   const [campos, setCampos] = useState({
@@ -67,6 +76,43 @@ export function PainelDePromocoes({
 
   function definir(chave: keyof typeof campos, valor: string) {
     setCampos((atual) => ({ ...atual, [chave]: valor }));
+  }
+
+  async function coletar() {
+    setColetando(true);
+    try {
+      const resultado = await coletarDoTelegram();
+
+      if (!resultado.ok) {
+        toast.error("Não foi possível buscar", { description: resultado.error });
+        return;
+      }
+
+      const { promocoesNovas, boas, duplicadas, adiadas } = resultado.data;
+
+      // O caso comum é não ter nada novo. Dizer isso claramente evita a
+      // dúvida de "será que buscou mesmo?" e o clique repetido, que gasta
+      // cota à toa.
+      if (promocoesNovas === 0) {
+        toast.info(
+          duplicadas > 0
+            ? `Nada novo — ${duplicadas} oferta(s) já estavam aqui.`
+            : "Nada novo no grupo.",
+        );
+        return;
+      }
+
+      toast.success(
+        `${promocoesNovas} oferta(s) nova(s)` +
+          (boas.length > 0 ? `, ${boas.length} valendo a pena` : ""),
+        adiadas > 0
+          ? { description: `${adiadas} ficaram para a próxima busca.` }
+          : undefined,
+      );
+      router.refresh();
+    } finally {
+      setColetando(false);
+    }
   }
 
   function salvar() {
@@ -210,10 +256,27 @@ export function PainelDePromocoes({
           </div>
         </section>
       ) : (
-        <Button className="h-11" onClick={() => setMostrarForm(true)}>
-          <Plus className="size-4" aria-hidden />
-          Registrar oferta
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button className="h-11" onClick={() => setMostrarForm(true)}>
+            <Plus className="size-4" aria-hidden />
+            Registrar oferta
+          </Button>
+          {podeColetar ? (
+            <Button
+              variant="outline"
+              className="h-11"
+              onClick={coletar}
+              disabled={coletando}
+            >
+              {coletando ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Download className="size-4" aria-hidden />
+              )}
+              {coletando ? "Buscando…" : "Buscar ofertas"}
+            </Button>
+          ) : null}
+        </div>
       )}
 
       {promocoes.length === 0 ? null : (

@@ -45,6 +45,16 @@ const serverEnvSchema = z.object({
   // Modelo fixo, nunca "latest": um modelo que muda sozinho altera o
   // comportamento da leitura de etiqueta sem ninguem ter mexido em codigo.
   AI_MODEL: z.string().default("gemini-3.6-flash"),
+  /**
+   * Modelo do trabalho de fundo (coleta de promoções).
+   *
+   * Separado de propósito: na camada gratuita a cota diária é *por modelo*.
+   * Com um modelo só, um dia movimentado no grupo de promoções esgotaria a
+   * cota e a leitura de etiqueta — que é trabalho de verdade, com uma pessoa
+   * esperando — pararia de funcionar. Modelos diferentes, cotas
+   * independentes: o bot nunca rouba a cota de quem está usando o sistema.
+   */
+  AI_MODEL_LOTE: z.string().default("gemini-3.5-flash-lite"),
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),

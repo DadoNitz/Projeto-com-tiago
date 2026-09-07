@@ -22,6 +22,7 @@
     "cron:check": "node --env-file=.env scripts/testar-cron.mjs",
     "limpar-demo": "tsx scripts/limpar-demonstracao.ts",
     "usuario": "tsx scripts/criar-usuario.ts",
+    "telegram": "node --env-file=.env scripts/telegram.mjs",
     "backup": "tsx scripts/backup.ts",
     "restaurar": "tsx scripts/restaurar.ts"
   },

@@ -12,7 +12,18 @@ import { IAIndisponivelError, type AIProvider } from "./types";
  * negócio conhece o fornecedor.
  */
 
-let instancia: AIProvider | null = null;
+/**
+ * Para que serve a chamada.
+ *
+ * - `interativo`: alguém está esperando a resposta na tela.
+ * - `lote`: trabalho de fundo, sem ninguém olhando.
+ *
+ * A distinção existe porque a cota gratuita é contada por modelo. Ver
+ * `AI_MODEL_LOTE` em `env.ts`.
+ */
+export type FinalidadeDaIA = "interativo" | "lote";
+
+const instancias = new Map<FinalidadeDaIA, AIProvider>();
 
 /** Erro lançado quando o sistema não tem IA configurada. */
 export class IANaoConfiguradaError extends Error {
@@ -40,15 +51,22 @@ export function iaDisponivel(): boolean {
   }
 }
 
-export function aiProvider(): AIProvider {
-  if (instancia) return instancia;
+export function aiProvider(
+  finalidade: FinalidadeDaIA = "interativo",
+): AIProvider {
+  const jaCriada = instancias.get(finalidade);
+  if (jaCriada) return jaCriada;
 
-  const { AI_PROVIDER, AI_MODEL, GEMINI_API_KEY } = env();
+  const { AI_PROVIDER, AI_MODEL, AI_MODEL_LOTE, GEMINI_API_KEY } = env();
 
   if (AI_PROVIDER === "gemini") {
     if (!GEMINI_API_KEY) throw new IANaoConfiguradaError();
-    instancia = new GeminiProvider(GEMINI_API_KEY, AI_MODEL);
-    return instancia;
+    const criada = new GeminiProvider(
+      GEMINI_API_KEY,
+      finalidade === "lote" ? AI_MODEL_LOTE : AI_MODEL,
+    );
+    instancias.set(finalidade, criada);
+    return criada;
   }
 
   // OpenAI e Anthropic entram implementando a mesma interface. Não estão
