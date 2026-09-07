@@ -154,11 +154,44 @@ voltam na próxima, em vez de sumirem.
 A coleta é registrada na auditoria como ação **do sistema**, com autor nulo.
 Atribuí-la a um administrador diria que uma pessoa fez o que a máquina fez.
 
+### Coletor automático de canais (opcional, roda fora da Vercel)
+
+Um bot **não** consegue ler canal de terceiro: só recebe mensagens de chats
+onde foi adicionado (e num canal, só um admin adiciona), e a API de bots nem
+tem método para ler histórico. Para acompanhar PC do Fafa, Fraguas e afins o
+único caminho é a API de cliente (MTProto), com a **sua conta**.
+
+```
+npm run telegram:login     # uma vez; grava a sessão no .env
+npm run telegram:canais    # lista canais e ids, para configurar sem errar
+npm run telegram:coletar   # uma passada
+npm run telegram:coletar -- --continuo
+```
+
+**O que ele faz:** lê os canais, aplica o mesmo `valeChamarIA` do bot, e
+reencaminha o que sobra para o grupo. Só isso. Não fala com IA, não escreve
+no banco, não avalia preço — o `@notztech_bot` continua fazendo tudo isso a
+partir do grupo, com o código que já existia.
+
+A separação é o ponto: este é o componente que roda com a conta pessoal, e
+componente arriscado tem que ser pequeno. Parar de rodá-lo não quebra nada —
+volta-se a encaminhar na mão.
+
+**O risco, dito claramente:** a `TELEGRAM_SESSION` **é** a conta. Quem tiver
+ela lê conversas privadas e envia mensagem no seu nome, e ela não expira
+sozinha. Fica no `.env` (coberto pelo `.gitignore`) e nunca é impressa no
+terminal. Revogar: Telegram → Ajustes → Dispositivos → encerrar sessão.
+
+Automação de conta pessoal é zona cinzenta no ToS do Telegram. Por isso o
+coletor só lê e reencaminha, com teto de 25 reencaminhos por passada, 2,5s
+entre cada um, e parada imediata quando o Telegram pede `FloodWait`.
+
 ## Restrições operacionais conhecidas
 
-**A camada gratuita do Gemini dá cerca de 20 requisições por dia, por
-modelo.** Medido na chave em uso, não estimado. Três consequências no
-sistema:
+**A cota gratuita do Gemini varia MUITO por modelo.** Medido na chave em uso:
+`gemini-3.6-flash` (interativo) parou em **20 requisições/dia**;
+`gemini-3.5-flash-lite` (lote) passou de 24 seguidas sem reclamar, e a
+documentação aponta para a casa do milhar. Consequências no sistema:
 
 - Um **pré-filtro determinístico** (`src/domain/promotions/pre-filtro.ts`)
   descarta ~9 de 12 mensagens típicas de grupo antes de gastar chamada. Ele
@@ -171,6 +204,10 @@ sistema:
 - Os testes que chamam o modelo são **opt-in** (`TESTAR_IA=1`). Sem isso eles
   queimavam a cota do dia na suíte normal e falhavam por 429 — uma falha que
   não diz nada sobre o código.
+- O teto da coleta **não** é um número de mensagens, e sim um orçamento de
+  tempo (`ORCAMENTO_DE_TEMPO_MS`): a função da Vercel morre em 300s, e ser
+  morto no meio é pior que parar sozinho — o offset não é gravado e o ciclo
+  inteiro é refeito, pagando de novo por tudo.
 
 Ao estourar, o sistema mostra "limite de requisições atingido" em vez de um
 erro genérico.
