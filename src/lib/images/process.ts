@@ -141,7 +141,7 @@ export async function prepararParaLeitura(dados: Buffer): Promise<{
 export function montarChave(
   escopo: "produtos" | "unidades" | "etiquetas",
   id: string,
-  sufixo: "original" | "thumb",
+  sufixo: "original" | "thumb" | "recorte",
 ): string {
   return `${escopo}/${id}/${sufixo}.webp`;
 }

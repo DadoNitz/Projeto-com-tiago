@@ -5,11 +5,14 @@ import Image from "next/image";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { RemoverFundoDaFoto } from "@/components/inventory/remover-fundo";
 import { Button } from "@/components/ui/button";
 
 interface Foto {
   id: string;
   url: string;
+  /** Versão sem fundo, quando já foi gerada. Fica ao lado da original. */
+  urlRecorte?: string | undefined;
 }
 
 /**
@@ -99,30 +102,48 @@ export function FotosDaPeca({
       {fotos.length > 0 ? (
         <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {fotos.map((foto) => (
-            <li
-              key={foto.id}
-              className="bg-muted relative aspect-square overflow-hidden rounded-md border"
-            >
-              <Image
-                src={foto.url}
-                alt=""
-                fill
-                sizes="(max-width: 640px) 33vw, 25vw"
-                className="object-cover"
-                // Miniatura, nunca a original: carregar imagem em resolução
-                // máxima numa grade é o que a seção 33 proíbe.
-                unoptimized
-              />
-              <button
-                type="button"
-                aria-label="Remover foto da lista"
-                onClick={() =>
-                  setFotos((atual) => atual.filter((f) => f.id !== foto.id))
-                }
-                className="bg-background/90 absolute top-1 right-1 rounded-full p-1"
-              >
-                <X className="size-3" aria-hidden />
-              </button>
+            <li key={foto.id} className="space-y-1.5">
+              <div className="bg-muted relative aspect-square overflow-hidden rounded-md border">
+                <Image
+                  src={foto.urlRecorte ?? foto.url}
+                  alt=""
+                  fill
+                  sizes="(max-width: 640px) 33vw, 25vw"
+                  className="object-cover"
+                  // Miniatura, nunca a original: carregar imagem em resolução
+                  // máxima numa grade é o que a seção 33 proíbe.
+                  unoptimized
+                />
+                <button
+                  type="button"
+                  aria-label="Remover foto da lista"
+                  onClick={() =>
+                    setFotos((atual) => atual.filter((f) => f.id !== foto.id))
+                  }
+                  className="bg-background/90 absolute top-1 right-1 rounded-full p-1"
+                >
+                  <X className="size-3" aria-hidden />
+                </button>
+                {foto.urlRecorte ? (
+                  <span className="bg-background/90 absolute bottom-1 left-1 rounded px-1.5 py-0.5 text-[10px]">
+                    sem fundo
+                  </span>
+                ) : null}
+              </div>
+
+              {!foto.urlRecorte ? (
+                <RemoverFundoDaFoto
+                  imageId={foto.id}
+                  urlOriginal={foto.url}
+                  aoConcluir={(urlRecorte) =>
+                    setFotos((atual) =>
+                      atual.map((f) =>
+                        f.id === foto.id ? { ...f, urlRecorte } : f,
+                      ),
+                    )
+                  }
+                />
+              ) : null}
             </li>
           ))}
 
