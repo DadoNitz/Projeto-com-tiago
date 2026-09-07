@@ -53,10 +53,7 @@ export function ListaEditavel({
   const [extras, setExtras] = useState<Record<string, string>>({});
   const [executando, iniciar] = useTransition();
 
-  function tratar(
-    promessa: Promise<ActionResult<unknown>>,
-    sucesso: string,
-  ) {
+  function tratar(promessa: Promise<ActionResult<unknown>>, sucesso: string) {
     iniciar(async () => {
       const resultado = await promessa;
       if (!resultado.ok) {
@@ -86,7 +83,9 @@ export function ListaEditavel({
     } else {
       tratar(
         alternarSocio({ id: item.id, ativo: item.ativo === false }),
-        item.ativo === false ? `${item.nome} reativado` : `${item.nome} desativado`,
+        item.ativo === false
+          ? `${item.nome} reativado`
+          : `${item.nome} desativado`,
       );
     }
   }
@@ -147,7 +146,7 @@ export function ListaEditavel({
         {itens.map((item) => (
           <li
             key={item.id}
-            className="flex items-center gap-3 px-4 py-2.5 text-sm"
+            className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm"
           >
             <span className="min-w-0 flex-1">
               <span
@@ -175,7 +174,7 @@ export function ListaEditavel({
             <Button
               variant="ghost"
               size="icon"
-              className="size-9 shrink-0"
+              className="size-11 shrink-0"
               onClick={() => remover(item)}
               disabled={executando}
               aria-label={
@@ -186,9 +185,7 @@ export function ListaEditavel({
                   : "Excluir"
               }
               title={
-                item.emUso
-                  ? `Em uso por ${item.emUso} registro(s)`
-                  : undefined
+                item.emUso ? `Em uso por ${item.emUso} registro(s)` : undefined
               }
             >
               {tipo === "socio" ? (
@@ -231,11 +228,11 @@ function BotaoRenomear({
   }
 
   return (
-    <span className="flex shrink-0 items-center gap-1">
+    <span className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
       <Input
         value={nome}
         onChange={(evento) => setNome(evento.target.value)}
-        className="h-9 w-40"
+        className="h-11 w-36"
         autoFocus
       />
       <Button

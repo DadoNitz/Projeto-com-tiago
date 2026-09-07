@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { Sidebar } from "@/components/layout/sidebar";
+import { SectionNav } from "@/components/layout/section-nav";
 import { Topbar } from "@/components/layout/topbar";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { PwaProvider } from "@/components/pwa/pwa-provider";
@@ -26,12 +27,22 @@ export default async function AppLayout({
 
   return (
     <div className="flex min-h-dvh">
+      <a
+        href="#conteudo"
+        className="bg-primary text-primary-foreground sr-only fixed top-2 left-2 z-[110] rounded-lg p-3 focus:not-sr-only"
+      >
+        Pular para o conteúdo
+      </a>
       <Sidebar role={ctx.role} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <PwaProvider>
           <Topbar nome={ctx.name} role={ctx.role} />
-          <main className="flex-1 px-3 pt-4 pb-20 sm:px-4 lg:px-6 lg:pb-6">
+          <main
+            id="conteudo"
+            className="app-main min-w-0 flex-1 px-4 pt-5 sm:px-6 lg:px-8 lg:pt-7"
+          >
+            <SectionNav role={ctx.role} />
             {children}
           </main>
         </PwaProvider>

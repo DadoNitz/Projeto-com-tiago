@@ -40,6 +40,50 @@ export interface DadosDeEdicaoDaUnidade {
   notes?: string | undefined;
 }
 
+/** Atualiza apenas os campos oferecidos na lista, preservando a ficha completa. */
+export async function atualizarResumoDaUnidade(
+  id: string,
+  dados: {
+    condition: UnitCondition;
+    purchaseCost: number | null;
+    estimatedSalePrice: number | null;
+  },
+  ctx: ActionContext,
+): Promise<void> {
+  const atual = await prisma.inventoryUnit.findUnique({
+    where: { id },
+    select: {
+      status: true,
+      condition: true,
+      purchaseCost: true,
+      estimatedSalePrice: true,
+    },
+  });
+  if (!atual) throw new NaoEncontradoError("Unidade de estoque");
+  if (atual.status === "DISCARDED") {
+    throw new EstoqueInvalidoError("Uma peça descartada não pode ser editada.");
+  }
+  await prisma.inventoryUnit.update({ where: { id }, data: dados });
+  await registrarAuditoria(
+    {
+      action: "update",
+      entity: "InventoryUnit",
+      entityId: id,
+      before: {
+        condition: atual.condition,
+        purchaseCost:
+          atual.purchaseCost === null ? null : Number(atual.purchaseCost),
+        estimatedSalePrice:
+          atual.estimatedSalePrice === null
+            ? null
+            : Number(atual.estimatedSalePrice),
+      },
+      after: dados,
+    },
+    ctx,
+  );
+}
+
 export async function atualizarUnidade(
   id: string,
   dados: DadosDeEdicaoDaUnidade,

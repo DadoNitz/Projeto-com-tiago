@@ -20,6 +20,9 @@ export function useServiceWorker(): {
   const recarregandoRef = useRef(false);
 
   useEffect(() => {
+    // Os arquivos do servidor de desenvolvimento não têm hashes imutáveis.
+    // Cacheá-los mistura versões antigas de JS/CSS com a interface nova.
+    if (process.env.NODE_ENV !== "production") return;
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
       return;
     }

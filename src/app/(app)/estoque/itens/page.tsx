@@ -1,11 +1,10 @@
-import { PackageSearch } from "lucide-react";
+import { ArrowLeftRight, PackageSearch, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-
-import { Icone } from "@/components/layout/icon";
-import { ConditionBadge, StatusBadge } from "@/components/shared/status-badge";
 import { buttonVariants } from "@/components/ui/button";
-import { formatarData, formatarMoeda, formatarNumero } from "@/lib/format";
+import { StatCard } from "@/components/shared/stat-card";
+import { can } from "@/lib/auth/permissions";
+import { formatarMoeda, formatarNumero, paraNumero } from "@/lib/format";
 import { linkDaPagina } from "@/lib/paginacao";
 import { filtroEstoqueSchema } from "@/lib/validation/inventory";
 import {
@@ -14,34 +13,22 @@ import {
   listarLocais,
 } from "@/server/services/catalog.service";
 import { listarUnidades } from "@/server/services/inventory.service";
-
+import { requireContext } from "@/server/session";
 import { Filtros } from "./filtros";
-import { LinhaClicavel } from "./linha-clicavel";
+import { ListaEstoque } from "./lista-estoque";
 
 export const metadata: Metadata = { title: "Estoque" };
 export const dynamic = "force-dynamic";
-
 type SearchParams = Record<string, string | string[] | undefined>;
 
-/**
- * Normaliza os parâmetros da URL para o formato do filtro.
- *
- * A URL sempre entrega texto e pode entregar valores repetidos. Passar isso
- * pelo mesmo schema Zod da action garante que a listagem e a API filtrem
- * exatamente igual.
- */
 function lerFiltro(searchParams: SearchParams) {
-  const bruto = {
+  const resultado = filtroEstoqueSchema.safeParse({
     ...searchParams,
     status: searchParams.status ? [searchParams.status].flat() : undefined,
     condition: searchParams.condition
       ? [searchParams.condition].flat()
       : undefined,
-  };
-
-  const resultado = filtroEstoqueSchema.safeParse(bruto);
-  // Filtro inválido na URL (link antigo, digitação) não pode quebrar a
-  // página: cai no filtro padrão.
+  });
   return resultado.success ? resultado.data : filtroEstoqueSchema.parse({});
 }
 
@@ -52,249 +39,169 @@ export default async function EstoquePage({
 }) {
   const params = await searchParams;
   const filtro = lerFiltro(params);
-
-  const [pagina, categorias, marcas, locais] = await Promise.all([
+  const [pagina, categorias, marcas, locais, ctx] = await Promise.all([
     listarUnidades(filtro),
     listarCategorias(),
     listarMarcas(),
     listarLocais(),
+    requireContext(),
   ]);
-
-  const filtrosAtivos = [
-    filtro.categoryId,
-    filtro.brandId,
-    filtro.locationId,
-    filtro.precoMin,
-    filtro.precoMax,
-    ...(filtro.status ?? []),
-    ...(filtro.condition ?? []),
-  ].filter(Boolean).length;
-
+  const itens = pagina.itens.map((unidade) => ({
+    id: unidade.id,
+    nome: unidade.product.name,
+    marca: unidade.product.brand?.name ?? "Sem marca",
+    codigo: unidade.internalCode,
+    icone: unidade.product.category.icon,
+    local: unidade.location?.name ?? null,
+    condition: unidade.condition,
+    status: unidade.status,
+    quantidade: unidade.quantity,
+    custo: paraNumero(unidade.purchaseCost),
+    valor: paraNumero(unidade.estimatedSalePrice),
+  }));
+  const valorPagina = itens.reduce(
+    (soma, item) => soma + (item.valor ?? 0) * item.quantidade,
+    0,
+  );
+  const semValor = itens.filter((item) => item.valor === null).length;
+  const podeEditar = can(ctx.role, "inventory:write");
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="mx-auto max-w-7xl space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+          <p className="text-primary mb-1 text-xs font-semibold tracking-widest uppercase">
+            Seu inventário
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             Estoque
           </h1>
-          <p className="text-muted-foreground text-sm">
-            {formatarNumero(pagina.total)}{" "}
-            {pagina.total === 1 ? "unidade encontrada" : "unidades encontradas"}
-            {filtro.q ? ` para "${filtro.q}"` : ""}
+          <p className="text-muted-foreground mt-1 text-sm">
+            Peças, valores e ações em um só lugar.
           </p>
         </div>
-
-        <div className="lg:hidden">
-          <Filtros
-            variante="mobile"
-            categorias={categorias.map((c) => ({ id: c.id, name: c.name }))}
-            marcas={marcas}
-            locais={locais}
-            totalAtivos={filtrosAtivos}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <div className="hidden lg:block">
-          <Filtros
-            variante="desktop"
-            categorias={categorias.map((c) => ({ id: c.id, name: c.name }))}
-            marcas={marcas}
-            locais={locais}
-            totalAtivos={filtrosAtivos}
-          />
-        </div>
-
-        <div className="min-w-0">
-          {pagina.itens.length === 0 ? (
-            <div className="bg-card flex flex-col items-center gap-3 rounded-lg border px-6 py-16 text-center">
-              <PackageSearch
-                className="text-muted-foreground size-10"
-                aria-hidden
-              />
-              <p className="font-medium">Nenhuma peça encontrada</p>
-              <p className="text-muted-foreground max-w-sm text-sm">
-                Ajuste os filtros ou tente outro termo de busca. A busca cobre
-                nome, modelo, part number, número de série e código interno.
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Celular: cards. Tabela larga é inutilizável em tela estreita. */}
-              <ul className="space-y-2 lg:hidden">
-                {pagina.itens.map((unidade) => (
-                  <li key={unidade.id}>
-                    <Link
-                      href={`/estoque/itens/${unidade.id}`}
-                      className="bg-card hover:border-primary/40 flex gap-3 rounded-lg border p-3 transition-colors"
-                    >
-                      <div className="bg-muted flex size-11 shrink-0 items-center justify-center rounded-md">
-                        <Icone
-                          nome={unidade.product.category.icon}
-                          className="text-muted-foreground size-5"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
-                          {unidade.product.name}
-                        </p>
-                        <p className="text-muted-foreground truncate text-xs">
-                          {unidade.product.brand?.name ?? "Sem marca"} ·{" "}
-                          {unidade.internalCode}
-                          {unidade.serialLast
-                            ? ` · ••${unidade.serialLast}`
-                            : ""}
-                        </p>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                          <StatusBadge status={unidade.status} />
-                          <ConditionBadge condition={unidade.condition} />
-                          {unidade.location ? (
-                            <span className="text-muted-foreground text-xs">
-                              {unidade.location.name}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-sm font-medium tabular-nums">
-                          {formatarMoeda(unidade.estimatedSalePrice)}
-                        </p>
-                        {unidade.quantity > 1 ? (
-                          <p className="text-muted-foreground text-xs">
-                            {unidade.quantity} un.
-                          </p>
-                        ) : null}
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-
-              {/* Desktop: tabela completa */}
-              <div className="bg-card hidden overflow-x-auto rounded-lg border lg:block">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 text-muted-foreground">
-                    <tr className="text-left">
-                      <th className="px-4 py-2.5 font-medium">Peça</th>
-                      <th className="px-4 py-2.5 font-medium">Código</th>
-                      <th className="px-4 py-2.5 font-medium">Situação</th>
-                      <th className="px-4 py-2.5 font-medium">Local</th>
-                      <th className="px-4 py-2.5 font-medium">Entrada</th>
-                      <th className="px-4 py-2.5 text-right font-medium">
-                        Valor
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {pagina.itens.map((unidade) => (
-                      <LinhaClicavel
-                        key={unidade.id}
-                        href={`/estoque/itens/${unidade.id}`}
-                      >
-                        <td className="px-4 py-2.5">
-                          <Link
-                            href={`/estoque/itens/${unidade.id}`}
-                            className="flex items-center gap-2.5"
-                          >
-                            <Icone
-                              nome={unidade.product.category.icon}
-                              className="text-muted-foreground size-4 shrink-0"
-                            />
-                            <span className="min-w-0">
-                              <span className="block truncate font-medium">
-                                {unidade.product.name}
-                              </span>
-                              <span className="text-muted-foreground block truncate text-xs">
-                                {unidade.product.brand?.name ?? "Sem marca"}
-                                {unidade.product.model
-                                  ? ` · ${unidade.product.model}`
-                                  : ""}
-                              </span>
-                            </span>
-                          </Link>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <span className="font-mono text-xs">
-                            {unidade.internalCode}
-                          </span>
-                          {unidade.serialLast ? (
-                            <span className="text-muted-foreground block font-mono text-xs">
-                              ••••{unidade.serialLast}
-                            </span>
-                          ) : null}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex flex-col items-start gap-1">
-                            <StatusBadge status={unidade.status} />
-                            <ConditionBadge condition={unidade.condition} />
-                          </div>
-                        </td>
-                        <td className="text-muted-foreground px-4 py-2.5">
-                          {unidade.location?.name ?? "—"}
-                        </td>
-                        <td className="text-muted-foreground px-4 py-2.5 whitespace-nowrap">
-                          {formatarData(unidade.entryDate)}
-                        </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">
-                          {formatarMoeda(unidade.estimatedSalePrice)}
-                          {unidade.quantity > 1 ? (
-                            <span className="text-muted-foreground block text-xs">
-                              {unidade.quantity} un.
-                            </span>
-                          ) : null}
-                        </td>
-                      </LinhaClicavel>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/*
-                "Carregar mais" prometia acúmulo que não acontece: a paginação
-                é por cursor, então o clique troca a página inteira e as peças
-                anteriores somem. Os rótulos agora dizem o que os links fazem,
-                e existe caminho de volta — antes, quem avançava só voltava
-                pelo botão do navegador.
-              */}
-              {pagina.proximoCursor || filtro.cursor ? (
-                <nav
-                  aria-label="Paginação"
-                  className="mt-4 flex justify-center gap-2"
-                >
-                  {filtro.cursor ? (
-                    <Link
-                      className={buttonVariants({
-                        variant: "outline",
-                        className: "h-11",
-                      })}
-                      href={linkDaPagina("/estoque/itens", params, null)}
-                    >
-                      Início da lista
-                    </Link>
-                  ) : null}
-
-                  {pagina.proximoCursor ? (
-                    <Link
-                      className={buttonVariants({
-                        variant: "outline",
-                        className: "h-11",
-                      })}
-                      href={linkDaPagina(
-                        "/estoque/itens",
-                        params,
-                        pagina.proximoCursor,
-                      )}
-                    >
-                      Próxima página
-                    </Link>
-                  ) : null}
-                </nav>
-              ) : null}
-            </>
+        <div className="flex gap-2">
+          <Link
+            href="/estoque/movimentacoes"
+            className={buttonVariants({ variant: "outline" })}
+          >
+            <ArrowLeftRight className="size-4" />
+            Histórico
+          </Link>
+          {podeEditar && (
+            <Link href="/estoque/novo" className={buttonVariants()}>
+              <Plus className="size-4" />
+              Nova peça
+            </Link>
           )}
         </div>
       </div>
+      <section
+        className="grid grid-cols-2 gap-3 lg:grid-cols-3"
+        aria-label="Resumo da listagem"
+      >
+        <StatCard
+          titulo="Peças encontradas"
+          valor={formatarNumero(pagina.total)}
+          detalhe="com os filtros atuais"
+          icone="Package"
+        />
+        <div className="hidden lg:block">
+          <StatCard
+            titulo="Disponíveis nesta página"
+            valor={formatarNumero(
+              itens
+                .filter((i) => i.status === "AVAILABLE")
+                .reduce((s, i) => s + i.quantidade, 0),
+            )}
+            detalhe="unidades prontas para uso"
+            icone="Check"
+            destaque="positivo"
+          />
+        </div>
+        <StatCard
+          titulo="Valor nesta página"
+          valor={
+            itens.length > 0 && semValor === itens.length
+              ? "—"
+              : formatarMoeda(valorPagina)
+          }
+          detalhe={
+            semValor ? `${semValor} sem valor definido` : "estimativa de venda"
+          }
+          icone="FileBarChart"
+        />
+      </section>
+      <Filtros
+        categorias={categorias.map((c) => ({ id: c.id, name: c.name }))}
+        marcas={marcas}
+        locais={locais}
+      />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">
+          Peças{" "}
+          <span className="text-muted-foreground ml-1 font-normal">
+            ({itens.length} de {formatarNumero(pagina.total)})
+          </span>
+        </h2>
+        {podeEditar && (
+          <p className="text-muted-foreground text-xs">
+            Toque no valor para editar
+            <span className="hidden lg:inline">
+              {" "}
+              · Botão direito para mais ações
+            </span>
+          </p>
+        )}
+      </div>
+      {itens.length === 0 ? (
+        <div className="bg-card flex flex-col items-center gap-3 rounded-2xl border px-6 py-16 text-center">
+          <PackageSearch className="text-primary size-10" aria-hidden />
+          <p className="font-medium">Nenhuma peça encontrada</p>
+          <p className="text-muted-foreground max-w-sm text-sm">
+            Ajuste os filtros ou busque por nome, modelo, serial ou código
+            interno.
+          </p>
+          <Link
+            href="/estoque/itens"
+            className={buttonVariants({ variant: "outline" })}
+          >
+            Limpar busca e filtros
+          </Link>
+        </div>
+      ) : (
+        <ListaEstoque
+          itens={itens}
+          podeEditar={podeEditar}
+          podeExcluir={can(ctx.role, "inventory:delete")}
+        />
+      )}
+      {pagina.proximoCursor || filtro.cursor ? (
+        <nav
+          aria-label="Paginação"
+          className="flex flex-wrap justify-center gap-2"
+        >
+          {filtro.cursor && (
+            <Link
+              className={buttonVariants({ variant: "outline" })}
+              href={linkDaPagina("/estoque/itens", params, null)}
+            >
+              Início da lista
+            </Link>
+          )}
+          {pagina.proximoCursor && (
+            <Link
+              className={buttonVariants({ variant: "outline" })}
+              href={linkDaPagina(
+                "/estoque/itens",
+                params,
+                pagina.proximoCursor,
+              )}
+            >
+              Próxima página
+            </Link>
+          )}
+        </nav>
+      ) : null}
     </div>
   );
 }

@@ -31,7 +31,7 @@ export function StatCard({
         <Icone
           nome={icone}
           className={cn(
-            "size-4 shrink-0",
+            "size-8 shrink-0 rounded-lg bg-muted/70 p-1.5",
             destaque === "atencao"
               ? "text-amber-600"
               : destaque === "positivo"
@@ -40,7 +40,7 @@ export function StatCard({
           )}
         />
       </div>
-      <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
+      <p className="mt-2 text-xl font-semibold tracking-tight tabular-nums break-words sm:text-2xl">
         {valor}
       </p>
       {detalhe ? (
@@ -50,7 +50,7 @@ export function StatCard({
   );
 
   const classe = cn(
-    "bg-card rounded-lg border p-4",
+    "bg-card min-w-0 h-full rounded-2xl border p-4",
     href && "hover:border-primary/40 transition-colors",
   );
 

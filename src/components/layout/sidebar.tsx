@@ -20,8 +20,8 @@ export function Sidebar({ role }: { role: Role }) {
   const pathname = usePathname();
 
   return (
-    <aside className="bg-sidebar text-sidebar-foreground hidden w-64 shrink-0 flex-col border-r lg:flex">
-      <div className="flex h-14 items-center gap-2 border-b px-4">
+    <aside className="bg-sidebar text-sidebar-foreground sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r lg:flex">
+      <div className="flex h-20 items-center gap-2 border-b px-4">
         <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
           <Icone nome="CircuitBoard" className="size-5" />
         </div>
@@ -47,7 +47,7 @@ export function Sidebar({ role }: { role: Role }) {
         <div className="px-3 pt-3">
           <Link
             href="/estoque/novo"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring flex h-10 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring flex h-11 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
             <Plus className="size-4" aria-hidden />
             Adicionar peça
@@ -55,7 +55,10 @@ export function Sidebar({ role }: { role: Role }) {
         </div>
       ) : null}
 
-      <nav className="flex-1 overflow-y-auto p-3" aria-label="Navegação principal">
+      <nav
+        className="flex-1 overflow-y-auto p-3"
+        aria-label="Navegação principal"
+      >
         <ul className="space-y-1">
           {NAVEGACAO.map((item) => (
             <ItemSidebar
@@ -102,7 +105,7 @@ function ItemSidebar({
           href={item.href}
           aria-current={ativo ? "page" : undefined}
           className={cn(
-            "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+            "flex items-center gap-3 min-h-11 rounded-xl px-3 py-2 text-sm transition-colors",
             "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none",
             ativo
@@ -115,7 +118,7 @@ function ItemSidebar({
         </Link>
       ) : (
         <span
-          className="text-muted-foreground/60 flex cursor-default items-center gap-3 rounded-md px-3 py-2 text-sm"
+          className="text-muted-foreground/60 flex cursor-default items-center gap-3 min-h-11 rounded-xl px-3 py-2 text-sm"
           title={`Ainda não implementado (${item.fase})`}
         >
           <Icone nome={item.icone} className="size-4 shrink-0" />
@@ -134,7 +137,7 @@ function ItemSidebar({
                 <Link
                   href={filho.href}
                   className={cn(
-                    "block rounded-md px-2 py-1.5 text-sm transition-colors",
+                    "block min-h-10 rounded-lg px-2 py-2.5 text-sm transition-colors",
                     "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                     pathname === filho.href
                       ? "text-sidebar-accent-foreground font-medium"

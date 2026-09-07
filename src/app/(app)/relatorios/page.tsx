@@ -74,7 +74,7 @@ export default async function RelatoriosPage({
             key={opcao}
             href={`/relatorios?periodo=${opcao}`}
             className={cn(
-              "rounded-full border px-3 py-1.5 text-xs transition-colors",
+              "inline-flex min-h-11 items-center rounded-xl border px-3 py-2 text-sm transition-colors",
               periodo === opcao
                 ? "bg-primary text-primary-foreground border-primary"
                 : "hover:bg-muted",
@@ -233,7 +233,9 @@ function Tabela({
             >
               <span className="truncate">{linha.rotulo}</span>
               <span className="text-right">
-                <span className="tabular-nums">{formatarMoeda(linha.valor)}</span>
+                <span className="tabular-nums">
+                  {formatarMoeda(linha.valor)}
+                </span>
                 <span className="text-muted-foreground ml-2 text-xs">
                   {linha.quantidade} un.
                 </span>

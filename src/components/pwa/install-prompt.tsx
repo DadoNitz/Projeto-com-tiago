@@ -2,6 +2,7 @@
 
 import { Download, Share, X } from "lucide-react";
 import { useCallback, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 
@@ -112,7 +113,12 @@ function getServerSnapshot(): Convite {
  * a especificação pede explicitamente para não insistir.
  */
 export function InstallPrompt() {
-  const convite = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const convite = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
+  const pathname = usePathname();
 
   const instalar = useCallback(async () => {
     if (!eventoNativo) return;
@@ -129,10 +135,12 @@ export function InstallPrompt() {
     notificar(SEM_CONVITE);
   }, []);
 
-  if (convite.tipo === "nenhum") return null;
+  // Mantém o evento de instalação registrado, mas não cobre listas e formulários.
+  if (convite.tipo === "nenhum" || !["/dashboard", "/mais"].includes(pathname))
+    return null;
 
   return (
-    <div className="bg-card fixed inset-x-3 bottom-20 z-50 rounded-lg border p-3 shadow-lg sm:right-4 sm:left-auto sm:w-80 md:bottom-4">
+    <div className="bg-card fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 rounded-2xl border p-3 shadow-lg sm:right-4 sm:left-auto sm:w-80 lg:bottom-4">
       <div className="flex items-start gap-3">
         <Download
           className="text-muted-foreground mt-0.5 size-5 shrink-0"
@@ -166,7 +174,7 @@ export function InstallPrompt() {
           type="button"
           onClick={dispensar}
           aria-label="Dispensar"
-          className="text-muted-foreground hover:text-foreground -m-1 shrink-0 p-1"
+          className="text-muted-foreground hover:text-foreground -m-1 flex size-11 shrink-0 items-center justify-center rounded-lg hover:bg-muted"
         >
           <X className="size-4" aria-hidden />
         </button>

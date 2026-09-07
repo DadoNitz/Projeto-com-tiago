@@ -26,13 +26,7 @@ import { encerrarSessao } from "@/server/actions/auth.actions";
  * filtrar na tela atual — é o comportamento esperado de uma busca global, e
  * mantém um único lugar onde a filtragem acontece.
  */
-export function Topbar({
-  nome,
-  role,
-}: {
-  nome: string;
-  role: Role;
-}) {
+export function Topbar({ nome, role }: { nome: string; role: Role }) {
   const router = useRouter();
   const [termo, setTermo] = useState("");
   const [saindo, iniciarSaida] = useTransition();
@@ -47,7 +41,9 @@ export function Topbar({
     evento.preventDefault();
     const limpo = termo.trim();
     router.push(
-      limpo ? `/estoque/itens?q=${encodeURIComponent(limpo)}` : "/estoque/itens",
+      limpo
+        ? `/estoque/itens?q=${encodeURIComponent(limpo)}`
+        : "/estoque/itens",
     );
   }
 
@@ -67,14 +63,18 @@ export function Topbar({
   }
 
   return (
-    <header className="bg-background/95 sticky top-0 z-30 flex h-14 items-center gap-3 border-b px-3 backdrop-blur sm:px-4">
-      <Link href="/dashboard" className="flex items-center gap-2 lg:hidden">
+    <header className="bg-card/95 sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b px-4 py-2 backdrop-blur sm:gap-3 sm:px-6">
+      <Link
+        href="/dashboard"
+        aria-label="Ir para o início"
+        className="flex size-11 shrink-0 items-center justify-center lg:hidden"
+      >
         <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
           <Icone nome="CircuitBoard" className="size-5" />
         </div>
       </Link>
 
-      <form onSubmit={buscar} className="max-w-md flex-1" role="search">
+      <form onSubmit={buscar} className="min-w-0 max-w-lg flex-1" role="search">
         <div className="relative">
           <Search
             className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
@@ -86,7 +86,7 @@ export function Topbar({
             onChange={(evento) => setTermo(evento.target.value)}
             placeholder="Buscar peça, serial, código…"
             aria-label="Buscar no estoque"
-            className="h-10 pl-9"
+            className="h-11 bg-muted/50 pl-9"
           />
         </div>
       </form>
@@ -97,7 +97,7 @@ export function Topbar({
             <Button
               variant="ghost"
               size="icon"
-              className="size-10 shrink-0 rounded-full"
+              className="ml-auto size-11 shrink-0 rounded-full"
               aria-label="Menu do usuário"
             />
           }

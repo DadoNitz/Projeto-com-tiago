@@ -29,10 +29,15 @@ export function BottomNav({ role }: { role: Role }) {
   return (
     <nav
       aria-label="Navegação"
-      className="bg-background/95 fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur lg:hidden"
+      className="bg-card/95 fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur lg:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <ul className="grid grid-cols-5">
+      <ul
+        className="grid"
+        style={{
+          gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))`,
+        }}
+      >
         {itens.map((item) => {
           const ativo =
             item.href === "/dashboard"
@@ -46,7 +51,7 @@ export function BottomNav({ role }: { role: Role }) {
                 className={cn(
                   "flex items-center justify-center",
                   destaque &&
-                    "bg-primary text-primary-foreground -mt-5 size-11 rounded-full shadow-lg",
+                    "bg-primary text-primary-foreground size-11 rounded-2xl",
                 )}
               >
                 <Icone
@@ -64,7 +69,7 @@ export function BottomNav({ role }: { role: Role }) {
                 <span
                   aria-disabled
                   title={`Ainda não implementado (${item.fase})`}
-                  className="text-muted-foreground/40 flex h-14 flex-col items-center justify-center gap-1"
+                  className="text-muted-foreground/40 flex min-h-16 flex-col items-center justify-center gap-1"
                 >
                   {conteudo}
                 </span>
@@ -78,8 +83,10 @@ export function BottomNav({ role }: { role: Role }) {
                 href={item.href}
                 aria-current={ativo ? "page" : undefined}
                 className={cn(
-                  "flex h-14 flex-col items-center justify-center gap-1 transition-colors",
-                  ativo ? "text-primary" : "text-muted-foreground",
+                  "flex min-h-16 flex-col items-center justify-center gap-1 transition-colors",
+                  ativo
+                    ? "text-primary font-semibold"
+                    : "text-muted-foreground",
                 )}
               >
                 {conteudo}

@@ -1,9 +1,10 @@
-import { AlertTriangle, ArrowRight } from "lucide-react";
+import { AlertTriangle, ArrowRight, ScanLine } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Icone } from "@/components/layout/icon";
 import { StatCard } from "@/components/shared/stat-card";
+import { buttonVariants } from "@/components/ui/button";
 import { ConditionBadge, StatusBadge } from "@/components/shared/status-badge";
 import { formatarData, formatarMoeda, formatarNumero } from "@/lib/format";
 import {
@@ -34,13 +35,25 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-          Dashboard
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Visão geral do estoque em tempo real.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-primary mb-1 text-xs font-semibold tracking-widest uppercase">
+            Visão geral
+          </p>
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+            Tudo sob controle
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Visão geral do estoque em tempo real.
+          </p>
+        </div>
+        <Link
+          href="/estoque/ler"
+          className={buttonVariants({ variant: "outline" })}
+        >
+          <ScanLine className="size-4" />
+          Ler QR Code
+        </Link>
       </div>
 
       <section
@@ -129,7 +142,7 @@ export default async function DashboardPage() {
                         className="text-muted-foreground size-4 shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline justify-between gap-2">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
                           <span className="truncate text-sm">
                             {categoria.name}
                           </span>

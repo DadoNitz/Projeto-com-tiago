@@ -7,6 +7,7 @@ import { UnitCondition } from "@/generated/prisma/enums";
 import {
   atualizarProduto,
   atualizarUnidade,
+  atualizarResumoDaUnidade,
   excluirUnidade,
 } from "@/server/services/unit-write.service";
 
@@ -38,7 +39,43 @@ const texto = (max: number) =>
     .transform((valor) => (valor.length === 0 ? undefined : valor))
     .optional();
 
-export async function salvarUnidade(input: unknown): Promise<ActionResult<null>> {
+export async function salvarResumoUnidade(
+  input: unknown,
+): Promise<ActionResult<null>> {
+  const resultado = await runAction(
+    {
+      permission: "inventory:write",
+      schema: z.object({
+        id: z.string().min(1),
+        condition: z.enum(UnitCondition),
+        purchaseCost: z.number().finite().min(0).max(999999999).nullable(),
+        estimatedSalePrice: z
+          .number()
+          .finite()
+          .min(0)
+          .max(999999999)
+          .nullable(),
+      }),
+      async handler({ id, ...dados }, ctx) {
+        await atualizarResumoDaUnidade(id, dados, ctx);
+        revalidatePath(`/estoque/itens/${id}`);
+        return null;
+      },
+    },
+    input,
+  );
+  if (resultado.ok) {
+    revalidatePath("/estoque/itens");
+    revalidatePath("/dashboard");
+    revalidatePath("/socios");
+    revalidatePath("/relatorios");
+  }
+  return resultado;
+}
+
+export async function salvarUnidade(
+  input: unknown,
+): Promise<ActionResult<null>> {
   const resultado = await runAction(
     {
       permission: "inventory:write",
@@ -122,7 +159,9 @@ export async function salvarProduto(
   return resultado;
 }
 
-export async function removerUnidade(input: unknown): Promise<ActionResult<null>> {
+export async function removerUnidade(
+  input: unknown,
+): Promise<ActionResult<null>> {
   const resultado = await runAction(
     {
       permission: "inventory:delete",

@@ -176,7 +176,7 @@ function FiltroTipo({
     <Link
       href={href}
       className={cn(
-        "rounded-full border px-3 py-1.5 text-xs transition-colors",
+        "inline-flex min-h-11 items-center rounded-xl border px-3 py-2 text-sm transition-colors",
         ativo
           ? "bg-primary text-primary-foreground border-primary"
           : "hover:bg-muted",
