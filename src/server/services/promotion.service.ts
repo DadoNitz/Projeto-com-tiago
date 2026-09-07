@@ -2,6 +2,10 @@ import "server-only";
 
 import { z } from "zod";
 
+import {
+  CATEGORIAS_DE_ELETRONICO,
+  type Segmento,
+} from "@/domain/promotions/categorias";
 import { aiProvider, iaDisponivel } from "@/lib/ai";
 import { prisma } from "@/server/db/client";
 import { formatarMoeda } from "@/lib/format";
@@ -104,9 +108,58 @@ export async function registrarPromocao(
   return promocao;
 }
 
-export async function listarPromocoes(apenasAtivas = true) {
+/**
+ * Restringe a consulta a um segmento.
+ *
+ * `pc` inclui quem está sem categoria — promoção cadastrada à mão não tem
+ * uma, e sumir da tela principal logo depois de ser digitada seria pior que
+ * aparecer no lugar errado. Ver `segmentoDaCategoria`.
+ */
+function filtroDeSegmento(segmento: Segmento | "tudo") {
+  if (segmento === "tudo") return {};
+  const eletronicos = [...CATEGORIAS_DE_ELETRONICO];
+
+  return segmento === "eletronico"
+    ? { categorySlug: { in: eletronicos } }
+    : {
+        OR: [
+          { categorySlug: { notIn: eletronicos } },
+          { categorySlug: null },
+        ],
+      };
+}
+
+/**
+ * Quantas promoções há em cada segmento.
+ *
+ * A tela mostra o número no próprio filtro: sem ele, uma aba vazia parece
+ * defeito ("cadê as ofertas?"), e com ele fica claro que não chegou nada
+ * daquele tipo ainda.
+ */
+export async function contarPromocoesPorSegmento(
+  apenasAtivas = true,
+): Promise<{ pc: number; eletronico: number; tudo: number }> {
+  const ativas = apenasAtivas ? { active: true } : {};
+
+  const [pc, eletronico] = await Promise.all([
+    prisma.promotion.count({ where: { ...ativas, ...filtroDeSegmento("pc") } }),
+    prisma.promotion.count({
+      where: { ...ativas, ...filtroDeSegmento("eletronico") },
+    }),
+  ]);
+
+  return { pc, eletronico, tudo: pc + eletronico };
+}
+
+export async function listarPromocoes(
+  apenasAtivas = true,
+  segmento: Segmento | "tudo" = "tudo",
+) {
   return prisma.promotion.findMany({
-    where: apenasAtivas ? { active: true } : {},
+    where: {
+      ...(apenasAtivas ? { active: true } : {}),
+      ...filtroDeSegmento(segmento),
+    },
     orderBy: { seenAt: "desc" },
     take: 50,
     select: {

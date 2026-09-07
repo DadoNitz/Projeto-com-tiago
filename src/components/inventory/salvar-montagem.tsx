@@ -34,6 +34,7 @@ export function SalvarMontagem({
   valorSugerido,
   incompativel,
   jaMontado = false,
+  aoSalvar,
 }: {
   unitIds: string[];
   nomeSugerido: string;
@@ -50,6 +51,14 @@ export function SalvarMontagem({
    * bancada faria a tela descrever uma situação que não é a verdadeira.
    */
   jaMontado?: boolean;
+  /**
+   * Chamado depois que o servidor confirmou a gravação.
+   *
+   * Serve para a tela de montagem manual descartar o rascunho guardado. Sem
+   * isto, a próxima montagem abriria com as peças da anterior já marcadas — e
+   * elas nem estariam mais disponíveis.
+   */
+  aoSalvar?: () => void;
 }) {
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
@@ -86,6 +95,8 @@ export function SalvarMontagem({
         toast.error("Não foi possível salvar", { description: resultado.error });
         return;
       }
+
+      aoSalvar?.();
 
       toast.success(jaMontado ? "Montagem registrada" : "Montagem reservada", {
         description: `${resultado.data.pecasAlocadas} peças saíram do estoque disponível e voltam se você cancelar.`,

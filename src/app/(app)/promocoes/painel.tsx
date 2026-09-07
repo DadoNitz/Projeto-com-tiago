@@ -1,11 +1,13 @@
 "use client";
 
 import { Archive, Download, Loader2, Plus, Sparkles, Tag } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import type { Segmento } from "@/domain/promotions/categorias";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatarData, formatarMoeda } from "@/lib/format";
@@ -20,6 +22,8 @@ import { cn } from "@/lib/utils";
 export interface PromocaoNaTela {
   id: string;
   titulo: string;
+  /** Rótulo da categoria, quando a IA soube classificar. */
+  categoria: string | null;
   loja: string | null;
   precoAtual: number;
   precoNormal: number | null;
@@ -46,18 +50,31 @@ interface Referencia {
  * único parâmetro que importa numa operação de revenda, e o único que um site
  * de promoções não tem como saber.
  */
+const FILTROS: { chave: Segmento | "tudo"; rotulo: string }[] = [
+  { chave: "pc", rotulo: "Peças de PC" },
+  { chave: "eletronico", rotulo: "Eletrônicos" },
+  { chave: "tudo", rotulo: "Tudo" },
+];
+
 export function PainelDePromocoes({
   promocoes,
+  segmento,
+  contagens,
   podeAvaliar,
   podeColetar,
 }: {
   promocoes: PromocaoNaTela[];
+  segmento: Segmento | "tudo";
+  contagens: { pc: number; eletronico: number; tudo: number };
   podeAvaliar: boolean;
   /** Só quando há bot configurado e a pessoa pode gastar cota de IA. */
   podeColetar: boolean;
 }) {
   const router = useRouter();
-  const [mostrarForm, setMostrarForm] = useState(promocoes.length === 0);
+  // Abre o formulário só quando não há promoção nenhuma no sistema. Abrir
+  // porque o filtro atual está vazio atrapalharia: a pessoa está olhando uma
+  // aba, não pedindo para cadastrar.
+  const [mostrarForm, setMostrarForm] = useState(contagens.tudo === 0);
   const [executando, iniciar] = useTransition();
   const [avaliando, setAvaliando] = useState<string | null>(null);
   const [coletando, setColetando] = useState(false);
@@ -159,6 +176,34 @@ export function PainelDePromocoes({
 
   return (
     <div className="space-y-4">
+      <nav
+        aria-label="Filtrar por tipo de produto"
+        className="flex flex-wrap gap-2"
+      >
+        {FILTROS.map((filtro) => {
+          const ativo = filtro.chave === segmento;
+
+          return (
+            <Link
+              key={filtro.chave}
+              href={`/promocoes?segmento=${filtro.chave}`}
+              aria-current={ativo ? "page" : undefined}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                ativo
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {filtro.rotulo}
+              <span className="ml-1.5 tabular-nums opacity-70">
+                {contagens[filtro.chave]}
+              </span>
+            </Link>
+          );
+        })}
+      </nav>
+
       {mostrarForm ? (
         <section className="bg-card space-y-3 rounded-lg border p-4">
           <h2 className="text-sm font-medium">Registrar uma oferta</h2>
@@ -279,7 +324,15 @@ export function PainelDePromocoes({
         </div>
       )}
 
-      {promocoes.length === 0 ? null : (
+      {promocoes.length === 0 ? (
+        contagens.tudo > 0 ? (
+          <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
+            Nenhuma oferta{" "}
+            {segmento === "eletronico" ? "de eletrônico" : "de peça de PC"} por
+            aqui. As outras abas ainda têm ofertas.
+          </p>
+        ) : null
+      ) : (
         <ul className="space-y-3">
           {promocoes.map((promocao) => {
             const custoReal =
@@ -306,6 +359,7 @@ export function PainelDePromocoes({
                       )}
                     </h3>
                     <p className="text-muted-foreground text-sm">
+                      {promocao.categoria ? `${promocao.categoria} · ` : ""}
                       {promocao.loja ?? "Loja não informada"} ·{" "}
                       {formatarData(promocao.vistaEm)}
                       {promocao.cupom ? ` · cupom ${promocao.cupom}` : ""}

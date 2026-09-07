@@ -42,6 +42,25 @@ https://kabum.com.br/x`).vale,
     );
   });
 
+  it("eletrônico de consumo, que agora interessa", () => {
+    // Controle, TV e fone chegam nos mesmos canais que a peça de PC. Passam
+    // aqui, e a separação entre os dois acontece depois, na categoria.
+    expect(
+      valeChamarIA("Controle Xbox Series sem fio por R$ 289 na Amazon").vale,
+    ).toBe(true);
+    expect(valeChamarIA("Smart TV TCL 55\" 4K por R$ 1.899").vale).toBe(true);
+    expect(
+      valeChamarIA("Power bank 20000mAh Elg por 89 reais no app").vale,
+    ).toBe(true);
+  });
+
+  it("eletrônico citado junto de categoria barrada", () => {
+    // "geladeira" barraria a mensagem sozinha; "smart tv" a resgata.
+    expect(
+      valeChamarIA("Geladeira R$ 2.199 e Smart TV 50 por R$ 1.599").vale,
+    ).toBe(true);
+  });
+
   it("mensagem que mistura outra categoria COM hardware", () => {
     // "perfume" aparece, mas "RTX" também. Barrar aqui perderia a oferta.
     expect(
@@ -100,12 +119,15 @@ describe("economia real", () => {
       "🔥 RTX 4060 por R$ 1.799 na Kabum",
       "Ryzen 5 5600 a R$ 699 na Pichau",
       "SSD Kingston NV2 1TB por 329 reais",
+      "Controle Gamesir T7 com fio por R$ 129",
     ];
 
     const passaram = lote.filter((m) => valeChamarIA(m).vale);
 
-    // As três ofertas de hardware passam; o resto é descartado sem custo.
-    expect(passaram).toHaveLength(3);
-    expect(passaram.every((m) => /rtx|ryzen|ssd/i.test(m))).toBe(true);
+    // Três de hardware e um eletrônico passam; o resto é descartado sem
+    // custo. Air fryer e perfume continuam barrados: alargar o filtro para
+    // eletrônico não é alargá-lo para tudo.
+    expect(passaram).toHaveLength(4);
+    expect(passaram.every((m) => /rtx|ryzen|ssd|controle/i.test(m))).toBe(true);
   });
 });

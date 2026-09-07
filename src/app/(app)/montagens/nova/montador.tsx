@@ -1,10 +1,11 @@
 "use client";
 
-import { Check, Cpu, Search, TriangleAlert, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Check, Cpu, RotateCcw, Search, TriangleAlert, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { SalvarMontagem } from "@/components/inventory/salvar-montagem";
 import { Input } from "@/components/ui/input";
+import { conferirRascunho } from "@/domain/builds/rascunho";
 import { avaliarCompatibilidade } from "@/domain/compatibility/engine";
 import {
   ROTULO_NIVEL,
@@ -13,6 +14,7 @@ import {
   type NivelCompatibilidade,
 } from "@/domain/compatibility/types";
 import { formatarMoeda } from "@/lib/format";
+import { toast } from "sonner";
 import type { PecaParaMontar } from "@/server/services/build.service";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +32,20 @@ import { cn } from "@/lib/utils";
  * cliente, o aviso de "esta RAM é DDR4 e a placa é DDR5" aparece no momento em
  * que você marca a peça — não depois de salvar. Descobrir depois é o caso em
  * que o estoque já foi alterado e precisa ser desfeito.
+ *
+ * ## A escolha sobrevive a sair da tela
+ *
+ * Montar um PC não acontece numa sentada só: a pessoa vai conferir uma peça na
+ * bancada, atende o telefone, procura o preço de outra. Perder a seleção nesse
+ * meio tempo obrigaria a começar tudo de novo, e é o tipo de perda que faz
+ * abandonar a ferramenta e voltar para o papel.
+ *
+ * Fica em `localStorage`, que é o lugar certo para isto: é rascunho pessoal
+ * daquele navegador, não é dado do negócio. Nada aqui é reservado no estoque
+ * até salvar — outra pessoa pode vender uma das peças enquanto você está fora.
+ * Por isso a restauração **confere** cada id contra o estoque disponível e
+ * descarta o que saiu, avisando. Mostrar como escolhida uma peça que já foi
+ * vendida seria a tela mentindo.
  *
  * ## Por que dá para salvar mesmo com incompatibilidade
  *
@@ -94,9 +110,86 @@ const AVALIADAS = new Set([
   "cooler",
 ]);
 
+/** Onde o rascunho da montagem fica guardado, neste navegador. */
+const CHAVE_DO_RASCUNHO = "montagem-em-andamento";
+
 export function Montador({ pecas }: { pecas: PecaParaMontar[] }) {
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
   const [busca, setBusca] = useState("");
+  // Só grava depois de ler: sem esta trava, o primeiro efeito gravaria o
+  // conjunto vazio inicial por cima do rascunho antes de ele ser lido.
+  const [rascunhoLido, setRascunhoLido] = useState(false);
+
+  const idsDisponiveis = useMemo(
+    () => new Set(pecas.map((peca) => peca.id)),
+    [pecas],
+  );
+
+  /*
+   * Restaura ao abrir.
+   *
+   * Precisa ser efeito, e não estado inicial: esta página é renderizada no
+   * servidor, onde `localStorage` não existe. Lendo no inicializador, o HTML
+   * do servidor viria sem seleção e o cliente viria com ela — e a hidratação
+   * quebraria com divergência de marcação.
+   *
+   * É por isso que a regra abaixo é dispensada aqui: "não chame setState em
+   * efeito" existe para evitar renderização em cascata, e este é o caso que a
+   * regra não cobre — carregar estado do navegador depois da hidratação.
+   */
+  useEffect(() => {
+    try {
+      const salvo = localStorage.getItem(CHAVE_DO_RASCUNHO);
+      if (salvo) {
+        // A conferência mora em `domain/builds/rascunho`, com testes: ela
+        // decide o que sobrevive e o que sumiu do estoque, e errar aqui
+        // mostraria como escolhida uma peça já vendida.
+        const { validos, perdidas } = conferirRascunho(
+          JSON.parse(salvo),
+          idsDisponiveis,
+        );
+
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- ver nota acima
+        if (validos.length > 0) setSelecionadas(new Set(validos));
+
+        // Peça que saiu do disponível enquanto a pessoa estava fora: foi
+        // vendida, reservada ou montada por outra pessoa. Sumir calado
+        // faria a montagem sair diferente do que ela lembrava de ter feito.
+        if (perdidas > 0) {
+          toast.warning(
+            perdidas === 1
+              ? "1 peça da sua seleção não está mais disponível"
+              : `${perdidas} peças da sua seleção não estão mais disponíveis`,
+            { description: "Foram vendidas, reservadas ou usadas em outra montagem." },
+          );
+        }
+      }
+    } catch {
+      // localStorage bloqueado (janela anônima, site data desligado) ou
+      // conteúdo corrompido. Começar do zero é degradação aceitável.
+    } finally {
+      setRascunhoLido(true);
+    }
+    // Só na montagem da tela: relê a cada mudança de estoque seria refazer a
+    // escolha da pessoa por baixo dela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Grava a cada mudança.
+  useEffect(() => {
+    if (!rascunhoLido) return;
+    try {
+      if (selecionadas.size === 0) localStorage.removeItem(CHAVE_DO_RASCUNHO);
+      else localStorage.setItem(CHAVE_DO_RASCUNHO, JSON.stringify([...selecionadas]));
+    } catch {
+      // Sem espaço ou sem permissão: a tela continua funcionando, só não
+      // lembra depois. Não vale interromper a montagem por isso.
+    }
+  }, [selecionadas, rascunhoLido]);
+
+  function limparTudo() {
+    setSelecionadas(new Set());
+  }
 
   function alternar(id: string) {
     setSelecionadas((atual) => {
@@ -267,17 +360,30 @@ export function Montador({ pecas }: { pecas: PecaParaMontar[] }) {
       {/* Resumo. Fixo na lateral em tela grande, empilhado no celular. */}
       <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start">
         <div className="rounded-lg border p-4">
-          <h2 className="flex items-center gap-2 text-sm font-semibold">
-            <Cpu className="size-4" aria-hidden />
-            {escolhidas.length === 0
-              ? "Nenhuma peça escolhida"
-              : `${escolhidas.length} peça(s)`}
-          </h2>
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <Cpu className="size-4" aria-hidden />
+              {escolhidas.length === 0
+                ? "Nenhuma peça escolhida"
+                : `${escolhidas.length} peça(s)`}
+            </h2>
+            {escolhidas.length > 0 ? (
+              <button
+                type="button"
+                onClick={limparTudo}
+                className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 text-xs"
+              >
+                <RotateCcw className="size-3" aria-hidden />
+                Limpar
+              </button>
+            ) : null}
+          </div>
 
           {escolhidas.length === 0 ? (
             <p className="text-muted-foreground mt-2 text-sm">
               Marque as peças que você usou neste PC. Elas passam para “em
-              montagem” no estoque quando você salvar.
+              montagem” no estoque quando você salvar — e a escolha fica
+              guardada se você sair da tela antes disso.
             </p>
           ) : (
             <>
@@ -368,6 +474,7 @@ export function Montador({ pecas }: { pecas: PecaParaMontar[] }) {
             valorSugerido={precoSugerido}
             incompativel={resultado.nivel === "INCOMPATIBLE"}
             jaMontado
+            aoSalvar={limparTudo}
           />
         ) : null}
       </aside>

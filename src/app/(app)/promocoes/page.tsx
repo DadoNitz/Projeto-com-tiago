@@ -1,9 +1,16 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import {
+  rotuloDaCategoria,
+  type Segmento,
+} from "@/domain/promotions/categorias";
 import { iaDisponivel } from "@/lib/ai";
 import { can } from "@/lib/auth/permissions";
-import { listarPromocoes } from "@/server/services/promotion.service";
+import {
+  contarPromocoesPorSegmento,
+  listarPromocoes,
+} from "@/server/services/promotion.service";
 import { telegramConfigurado } from "@/server/services/telegram.service";
 import { requireContext } from "@/server/session";
 
@@ -23,12 +30,34 @@ export const dynamic = "force-dynamic";
  * O valor da tela não está em achar a oferta, e sim em julgá-la. E aqui o
  * sistema tem um parâmetro que nenhum site de promoção tem: quanto você já
  * pagou naquela peça.
+ *
+ * A lista abre em "Peças de PC" de propósito. Os canais mandam eletrônico
+ * junto — controle, TV, projetor — e isso interessa, mas não é o trabalho:
+ * quem revende monta PC. O eletrônico fica a um clique, sem diluir a lista
+ * que se olha todo dia.
  */
-export default async function PromocoesPage() {
+const SEGMENTOS = ["pc", "eletronico", "tudo"] as const;
+
+function segmentoPedido(valor: string | undefined): Segmento | "tudo" {
+  return SEGMENTOS.includes(valor as (typeof SEGMENTOS)[number])
+    ? (valor as Segmento | "tudo")
+    : "pc";
+}
+
+export default async function PromocoesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ segmento?: string }>;
+}) {
   const ctx = await requireContext();
   if (!can(ctx.role, "inventory:read")) redirect("/dashboard");
 
-  const promocoes = await listarPromocoes();
+  const segmento = segmentoPedido((await searchParams).segmento);
+
+  const [promocoes, contagens] = await Promise.all([
+    listarPromocoes(true, segmento),
+    contarPromocoesPorSegmento(),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -44,6 +73,8 @@ export default async function PromocoesPage() {
       </div>
 
       <PainelDePromocoes
+        segmento={segmento}
+        contagens={contagens}
         podeAvaliar={can(ctx.role, "ai:use") && iaDisponivel()}
         podeColetar={
           can(ctx.role, "ai:use") && iaDisponivel() && telegramConfigurado()
@@ -51,6 +82,7 @@ export default async function PromocoesPage() {
         promocoes={promocoes.map((promocao) => ({
           id: promocao.id,
           titulo: promocao.title,
+          categoria: rotuloDaCategoria(promocao.categorySlug),
           loja: promocao.store?.name ?? null,
           precoAtual: Number(promocao.currentPrice),
           precoNormal: promocao.regularPrice

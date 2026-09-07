@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
+import { CATEGORIAS } from "@/domain/promotions/categorias";
 import { valeChamarIA } from "@/domain/promotions/pre-filtro";
 import { aiProvider, iaDisponivel } from "@/lib/ai";
 import { RespostaInvalidaError } from "@/lib/ai/types";
@@ -39,7 +40,7 @@ export interface PromocaoExtraida {
 }
 
 const respostaSchema = z.object({
-  ehPromocaoDeHardware: z.boolean(),
+  ehOfertaRelevante: z.boolean(),
   title: z.string().optional(),
   currentPrice: z.number().positive().optional(),
   regularPrice: z.number().positive().optional(),
@@ -50,29 +51,21 @@ const respostaSchema = z.object({
   confianca: z.enum(["alta", "media", "baixa"]).optional(),
 });
 
-/** Categorias que interessam. Fora disso, a mensagem é ignorada. */
-const CATEGORIAS = [
-  "cpu",
-  "motherboard",
-  "ram",
-  "gpu",
-  "storage",
-  "psu",
-  "case",
-  "cooler",
-  "monitor",
-  "peripheral",
-  "notebook",
-  "outros",
-] as const;
-
 const INSTRUCAO = [
   "Você lê mensagens de grupos de promoção e extrai a oferta.",
   "",
-  "Responda `ehPromocaoDeHardware: false` e mais nada quando a mensagem:",
+  "Interessa duas famílias de produto:",
+  "- peça de PC e periférico: processador, placa de vídeo, placa-mãe,",
+  "  memória, SSD, fonte, gabinete, cooler, monitor, teclado, mouse,",
+  "  headset, notebook;",
+  "- eletrônico de consumo: TV, celular, tablet, fone, caixa de som,",
+  "  videogame e controle, projetor, power bank, carregador, nobreak,",
+  "  smartwatch, roteador, casa inteligente.",
+  "",
+  "Responda `ehOfertaRelevante: false` e mais nada quando a mensagem:",
   "- não for uma oferta (conversa, bom dia, agradecimento, enquete);",
-  "- for de produto que não é informática (perfume, roupa, mercado, celular",
-  "  comum, TV, eletrodoméstico);",
+  "- for de produto fora das duas famílias acima (perfume, roupa, mercado,",
+  "  eletrodoméstico de cozinha, móvel, pet, suplemento, livro impresso);",
   "- não trouxer preço legível.",
   "",
   "Regras de extração:",
@@ -85,14 +78,17 @@ const INSTRUCAO = [
   "- `url` só se houver link na mensagem. Não invente.",
   "- `confianca: baixa` quando o preço ou o produto estiverem ambíguos.",
   "",
-  `Categorias válidas: ${CATEGORIAS.join(", ")}. Use "outros" se for de`,
-  "informática mas não encaixar nas demais.",
+  `Categorias válidas: ${CATEGORIAS.join(", ")}.`,
+  'Use "outros" para peça de PC que não encaixa nas demais, e',
+  '"eletronico-outros" para eletrônico que não encaixa. A categoria decide em',
+  "que aba a oferta aparece, então não chute entre as duas famílias: peça de",
+  "PC nunca recebe categoria de eletrônico, e vice-versa.",
 ].join("\n");
 
 const SCHEMA_DE_RESPOSTA = {
   type: "object",
   properties: {
-    ehPromocaoDeHardware: { type: "boolean" },
+    ehOfertaRelevante: { type: "boolean" },
     title: {
       type: "string",
       description: "Nome do produto, limpo de emoji e de texto promocional",
@@ -105,13 +101,13 @@ const SCHEMA_DE_RESPOSTA = {
     coupon: { type: "string" },
     confianca: { type: "string", enum: ["alta", "media", "baixa"] },
   },
-  required: ["ehPromocaoDeHardware"],
+  required: ["ehOfertaRelevante"],
 };
 
 /**
  * Extrai a oferta de uma mensagem.
  *
- * Devolve `null` quando a mensagem não é uma promoção de informática — que é
+ * Devolve `null` quando a mensagem não é uma oferta que interessa — que é
  * a maioria do tráfego de um grupo. Descartar cedo evita encher o sistema de
  * ruído e gastar avaliação de IA com perfume em oferta.
  */
@@ -124,7 +120,7 @@ export async function extrairPromocao(
 
   // Filtro determinístico antes da IA. A cota do plano gratuito é o recurso
   // escasso: um grupo de promoções manda dezenas de mensagens por hora, e a
-  // maioria não é oferta de informática. Ver `pre-filtro.ts`.
+  // maioria não é oferta nenhuma. Ver `pre-filtro.ts`.
   if (!valeChamarIA(limpo).vale) return null;
 
   // Modelo de lote: cota diária separada da leitura de etiqueta e do chat.
@@ -150,7 +146,7 @@ export async function extrairPromocao(
 
   const dados = parsed.data;
 
-  if (!dados.ehPromocaoDeHardware) return null;
+  if (!dados.ehOfertaRelevante) return null;
 
   // Sem título ou sem preço não existe promoção. Registrar com preço zero
   // criaria uma "oferta" que a avaliação trataria como boa demais.
