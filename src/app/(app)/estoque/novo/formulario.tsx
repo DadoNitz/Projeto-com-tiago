@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import {
+  enviarFotosDoCadastro,
+  FotosDoCadastro,
+  type FotoPendente,
+} from "@/components/inventory/fotos-do-cadastro";
+
 import { Icone } from "@/components/layout/icon";
 import {
   LeitorDeEtiqueta,
@@ -111,6 +117,7 @@ export function FormularioDeCadastro({
   const { online } = useOnlineStatus();
 
   const [passo, setPasso] = useState(0);
+  const [fotos, setFotos] = useState<FotoPendente[]>([]);
   const [erros, setErros] = useState<Record<string, string[] | undefined>>({});
 
   const [categoryId, setCategoryId] = useState("");
@@ -225,6 +232,9 @@ export function FormularioDeCadastro({
     { titulo: "Identificação", valido: nome.trim().length >= 2 },
     { titulo: "Estoque", valido: quantidade >= 1 },
     { titulo: "Especificações", valido: true },
+    // Sempre valido: fotos sao opcionais, e travar o cadastro por falta de
+    // foto atrapalharia justamente o uso rapido na bancada.
+    { titulo: "Fotos", valido: true },
   ];
 
   function enviar() {
@@ -295,16 +305,39 @@ export function FormularioDeCadastro({
         return;
       }
 
-      const { codigos } = resultado.data;
+      const { codigos, productId } = resultado.data;
+
+      // As fotos so podem subir agora: antes disto nao existia productId para
+      // vincular. Falha aqui nao invalida o cadastro — a peca ja esta gravada,
+      // e refazer tudo por causa de uma foto seria pior do que ficar sem ela.
+      let recado: string | undefined;
+
+      if (fotos.length > 0) {
+        const envio = await enviarFotosDoCadastro(fotos, { productId });
+
+        // Libera as previas: o formulario pode ser reaberto varias vezes na
+        // mesma sessao, e cada blob nao liberado fica na memoria do navegador.
+        for (const foto of fotos) {
+          URL.revokeObjectURL(foto.previa);
+          if (foto.previaRecorte) URL.revokeObjectURL(foto.previaRecorte);
+        }
+        setFotos([]);
+
+        if (envio.falharam > 0) {
+          recado = `${envio.falharam} foto(s) não subiram. Você pode adicioná-las na página da peça.`;
+        }
+      }
+
       toast.success(
         codigos.length === 1
           ? `Peça cadastrada: ${codigos[0]}`
           : `${codigos.length} unidades cadastradas`,
         {
           description:
-            codigos.length > 1
+            recado ??
+            (codigos.length > 1
               ? `Códigos ${codigos[0]} a ${codigos.at(-1)}`
-              : undefined,
+              : undefined),
         },
       );
       router.push("/estoque/itens");
@@ -672,6 +705,20 @@ export function FormularioDeCadastro({
             )}
           </div>
         ) : null}
+
+        {passo === 4 ? (
+          <div className="space-y-4">
+            <div>
+              <h2 className="font-medium">Fotos da peça</h2>
+              <p className="text-muted-foreground text-sm">
+                Opcional. Fotografe a peça como ela está — dá para remover o
+                fundo aqui mesmo, e a foto original continua guardada.
+              </p>
+            </div>
+
+            <FotosDoCadastro fotos={fotos} aoMudar={setFotos} />
+          </div>
+        ) : null}
       </div>
 
       <div className="flex items-center justify-between gap-3">
@@ -685,16 +732,26 @@ export function FormularioDeCadastro({
           Voltar
         </Button>
 
-        {passo < passos.length - 1 ? (
-          <Button
-            className="h-11"
-            disabled={!passos[passo]?.valido}
-            onClick={() => setPasso((atual) => atual + 1)}
-          >
-            Avançar
-            <ArrowRight className="size-4" aria-hidden />
-          </Button>
-        ) : (
+        {/*
+          Do passo de especificacoes em diante da para cadastrar direto: as
+          fotos sao o ultimo passo e sao opcionais, e obrigar a passar por elas
+          para so entao ver o botao transformaria "opcional" em "mais um
+          clique". "Avancar" continua ali ao lado para quem quer fotografar.
+        */}
+        <div className="flex items-center gap-2">
+          {passo < passos.length - 1 ? (
+            <Button
+              variant={passo >= 3 ? "outline" : "default"}
+              className="h-11"
+              disabled={!passos[passo]?.valido}
+              onClick={() => setPasso((atual) => atual + 1)}
+            >
+              {passo === 3 ? "Adicionar fotos" : "Avançar"}
+              <ArrowRight className="size-4" aria-hidden />
+            </Button>
+          ) : null}
+
+          {passo >= 3 ? (
           <Button
             className="h-11"
             onClick={enviar}
@@ -712,7 +769,8 @@ export function FormularioDeCadastro({
               </>
             )}
           </Button>
-        )}
+          ) : null}
+        </div>
       </div>
     </div>
   );
