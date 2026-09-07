@@ -14,6 +14,7 @@ import {
   coletarPromocoes,
   telegramConfigurado,
   MAXIMO_MANUAL,
+  ORCAMENTO_MANUAL_MS,
   type ResultadoDaColeta,
 } from "@/server/services/telegram.service";
 
@@ -132,7 +133,10 @@ export async function coletarDoTelegram(): Promise<
             "Telegram nao configurado. Falta definir TELEGRAM_BOT_TOKEN.",
           );
         }
-        return coletarPromocoes({ teto: MAXIMO_MANUAL });
+        return coletarPromocoes({
+          teto: MAXIMO_MANUAL,
+          orcamentoMs: ORCAMENTO_MANUAL_MS,
+        });
       },
     },
     {},

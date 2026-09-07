@@ -36,18 +36,33 @@ import { avaliarPromocao, registrarPromocao } from "./promotion.service";
  */
 
 /**
- * Quantas mensagens processar por ciclo.
+ * Quantas mensagens processar por ciclo do agendamento.
  *
- * O número vem da cota, não de um palpite: a camada gratuita do Gemini dá
- * poucas dezenas de requisições por dia *por modelo*, e a coleta roda uma vez
- * ao dia. Gastar tudo num ciclo deixaria o resto do dia sem margem para uma
- * coleta manual — que é justamente o que se usa quando acabou de chegar uma
- * oferta boa.
+ * O teto anterior era 10, calculado sobre uma medição errada: os ~20
+ * pedidos/dia que eu tinha medido eram do modelo interativo, não do de lote.
+ * Medindo o de lote, 24 chamadas seguidas passaram sem reclamação, e a
+ * documentação aponta para a casa do milhar por dia.
+ *
+ * Com a cota deixando de ser o limite, o limite virou o **tempo**: a função
+ * da Vercel tem 300s, e cada oferta custa duas chamadas de modelo. Por isso
+ * existe também `ORCAMENTO_DE_TEMPO_MS` — é ele que protege de verdade, e um
+ * número de mensagens sozinho seria só um palpite sobre a duração.
  *
  * O que passa do teto não se perde: o `offset` não avança além do processado,
  * e as mensagens voltam no ciclo seguinte.
  */
-const MAXIMO_POR_CICLO = 10;
+const MAXIMO_POR_CICLO = 30;
+
+/**
+ * Quanto tempo a coleta pode gastar antes de parar por conta própria.
+ *
+ * A função morre em 300s. Ser interrompido pela plataforma no meio de uma
+ * gravação é a pior saída: o `offset` não é gravado, e o ciclo inteiro é
+ * refeito na próxima — pagando de novo por tudo que já tinha processado.
+ *
+ * Parando sozinho antes, o progresso é salvo e o resto continua depois.
+ */
+const ORCAMENTO_DE_TEMPO_MS = 200_000;
 
 /**
  * Teto da coleta manual, menor que o do agendamento.
@@ -60,7 +75,10 @@ const MAXIMO_POR_CICLO = 10;
  * Cortar cedo não perde nada: o `offset` só avança sobre o processado, e o
  * resto entra na próxima busca ou no agendamento.
  */
-const MAXIMO_MANUAL = 4;
+const MAXIMO_MANUAL = 8;
+
+/** Orçamento da coleta manual: uma Server Action tem menos folga. */
+const ORCAMENTO_MANUAL_MS = 45_000;
 
 /** Chave onde guardamos o ponto de leitura, na tabela de configuração. */
 const CHAVE_OFFSET = "telegram.ultimoUpdateId";
@@ -132,7 +150,7 @@ async function gravarOffset(valor: number): Promise<void> {
   });
 }
 
-export { MAXIMO_MANUAL };
+export { MAXIMO_MANUAL, ORCAMENTO_MANUAL_MS };
 
 export interface ResultadoDaColeta {
   lidas: number;
@@ -146,6 +164,8 @@ export interface ResultadoDaColeta {
   descartadasPelaIA: number;
   /** Ficaram para o próximo ciclo por causa do teto. */
   adiadas: number;
+  /** O ciclo parou por tempo, não por cota. Útil para saber qual freio ajustar. */
+  pararamPorTempo?: boolean;
 }
 
 /**
@@ -155,9 +175,11 @@ export interface ResultadoDaColeta {
  * meio — cota estourada, erro de rede — as mensagens restantes voltam no
  * próximo, em vez de se perderem.
  */
-export async function coletarPromocoes(
-  { teto = MAXIMO_POR_CICLO }: { teto?: number } = {},
-): Promise<ResultadoDaColeta> {
+export async function coletarPromocoes({
+  teto = MAXIMO_POR_CICLO,
+  orcamentoMs = ORCAMENTO_DE_TEMPO_MS,
+}: { teto?: number; orcamentoMs?: number } = {}): Promise<ResultadoDaColeta> {
+  const comecou = Date.now();
   const resultado: ResultadoDaColeta = {
     lidas: 0,
     descartadasSemCusto: 0,
@@ -208,10 +230,14 @@ export async function coletarPromocoes(
       continue;
     }
 
-    if (processadasComIA >= teto) {
-      // Teto atingido. Para aqui SEM avançar o offset além do que já foi
-      // processado: o resto volta no próximo ciclo em vez de sumir.
+    // Dois freios, e o de tempo é o que costuma disparar. Ambos param SEM
+    // avançar o offset além do processado: o resto volta no ciclo seguinte
+    // em vez de sumir.
+    const semTempo = Date.now() - comecou > orcamentoMs;
+
+    if (processadasComIA >= teto || semTempo) {
       resultado.adiadas = atualizacoes.length - indice;
+      if (semTempo) resultado.pararamPorTempo = true;
       break;
     }
 

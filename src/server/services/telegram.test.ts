@@ -233,3 +233,43 @@ describe("de qual cota a coleta gasta", () => {
     expect(ator).toMatchObject({ userId: null, origem: "telegram" });
   });
 });
+
+describe("orçamento de tempo", () => {
+  it("para sozinho antes de estourar a função, e salva o progresso", async () => {
+    // A função da Vercel morre em 300s. Ser morto no meio e a pior saida: o
+    // offset nao e gravado, e o ciclo inteiro e refeito na proxima — pagando
+    // de novo por tudo que ja tinha sido processado.
+    const { extrairPromocao } = await import("./deal-parser.service");
+
+    // Cada extração "gasta" 40s de relógio.
+    let agora = 1_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => agora);
+    vi.mocked(extrairPromocao).mockImplementation((texto: string) => {
+      agora += 40_000;
+      return Promise.resolve({
+        title: texto.slice(0, 40),
+        currentPrice: 1799,
+        confianca: "alta" as const,
+      });
+    });
+
+    respostaDoTelegram = Array.from({ length: 10 }, (_, i) =>
+      mensagem(200 + i, `${OFERTA} #${i}`),
+    );
+
+    // Teto alto de propósito: quem tem de parar o ciclo aqui é o tempo.
+    const r = await coletarPromocoes({ teto: 100, orcamentoMs: 120_000 });
+
+    expect(r.pararamPorTempo).toBe(true);
+    expect(r.promocoesNovas).toBeGreaterThan(0);
+    expect(r.promocoesNovas).toBeLessThan(10);
+    expect(r.adiadas).toBeGreaterThan(0);
+
+    // O progresso foi gravado: sem isto o proximo ciclo refaria tudo.
+    const salvo = Number(configuracoes.get("telegram.ultimoUpdateId"));
+    expect(salvo).toBeGreaterThanOrEqual(200);
+    expect(salvo).toBeLessThan(209);
+
+    vi.mocked(Date.now).mockRestore();
+  });
+});
