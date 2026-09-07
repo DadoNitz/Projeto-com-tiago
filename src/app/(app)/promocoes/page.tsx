@@ -93,6 +93,7 @@ export default async function PromocoesPage({
           cashback: promocao.cashbackPct ? Number(promocao.cashbackPct) : null,
           cupom: promocao.coupon,
           url: promocao.url,
+          urlApp: promocao.appUrl,
           nota: promocao.aiScore,
           veredito: promocao.aiVerdict,
           vistaEm: promocao.seenAt,

@@ -72,3 +72,46 @@ https://www.kabum.com.br/produto/123456`);
     expect(r!.regularPrice).toBeUndefined();
   }, 200_000);
 });
+
+describe.skipIf(!temChave)("anuncio com dois links", () => {
+  it("separa o link do app do link de PC", async () => {
+    // Formato real dos canais de AliExpress. Os dois links nao levam ao mesmo
+    // preco: o do app tem desconto em moedas, e e dele que sai o valor
+    // anunciado. Trocar um pelo outro faria a pessoa abrir a oferta e
+    // encontrar um preco maior do que o sistema prometeu.
+    const r = await extrairPromocao(`👌Controle Sem Fio Machenike G1, Analógicos/Gatilhos Hall Effect, 1KHz
+
+💲Valor: R$85,00
+
+-Cupom: BRFS1 + Moedas no APP
+
+✅ Link App com desconto em moedas:
+👀 https://pcdofafa.com.br/p/aliexpress/833255
+
+✅ Link para PC / sem super desconto moedas:
+👀 https://pcdofafa.com.br/p/aliexpress/8uaj7t
+
+✅BOT DE DESCONTOS: @FafaPromobot`);
+
+    expect(r).not.toBeNull();
+    expect(r!.currentPrice).toBe(85);
+
+    // Cada link no seu campo, e nao trocados.
+    expect(r!.appUrl).toContain("833255");
+    expect(r!.url).toContain("8uaj7t");
+  });
+
+  it("com um link so, ele vai para `url` e nao inventa o do app", async () => {
+    // O caso comum. Preencher `appUrl` com o mesmo link faria a tela oferecer
+    // duas opcoes que sao a mesma coisa, sugerindo uma vantagem inexistente.
+    const r = await extrairPromocao(`👌 Placa-mãe Msi A520m-a Pro Am4 Matx Ddr4
+
+💲 Valor: R$331,00
+
+👀 https://meli.la/2tAi7zo`);
+
+    expect(r).not.toBeNull();
+    expect(r!.url).toContain("meli.la");
+    expect(r!.appUrl).toBeUndefined();
+  });
+});

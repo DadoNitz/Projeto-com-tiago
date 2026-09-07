@@ -35,7 +35,17 @@ export interface DadosDaPromocao {
   categorySlug?: string | undefined;
   currentPrice: number;
   regularPrice?: number | undefined;
+  /** Link para abrir no computador. */
   url?: string | undefined;
+  /**
+   * Link do aplicativo, quando a oferta traz um separado.
+   *
+   * Não é a mesma oferta em outro formato: nos canais do AliExpress o link do
+   * app costuma trazer desconto em moedas que o de PC não tem, e é o preço do
+   * app que aparece anunciado. Guardar um só apagaria a diferença, e quem
+   * abrisse no computador pagaria mais do que a oferta prometia.
+   */
+  appUrl?: string | undefined;
   coupon?: string | undefined;
   cashbackPct?: number | undefined;
   shippingCost?: number | undefined;
@@ -82,6 +92,7 @@ export async function registrarPromocao(
       regularPrice: dados.regularPrice ?? null,
       discountPct: desconto !== null ? Math.round(desconto * 100) / 100 : null,
       url: dados.url?.trim() || null,
+      appUrl: dados.appUrl?.trim() || null,
       coupon: dados.coupon?.trim() || null,
       cashbackPct: dados.cashbackPct ?? null,
       shippingCost: dados.shippingCost ?? null,
@@ -170,6 +181,7 @@ export async function listarPromocoes(
       regularPrice: true,
       discountPct: true,
       url: true,
+      appUrl: true,
       coupon: true,
       cashbackPct: true,
       shippingCost: true,

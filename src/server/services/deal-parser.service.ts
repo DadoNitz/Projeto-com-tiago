@@ -33,7 +33,10 @@ export interface PromocaoExtraida {
   regularPrice?: number | undefined;
   storeName?: string | undefined;
   categorySlug?: string | undefined;
+  /** Link para abrir no computador. */
   url?: string | undefined;
+  /** Link do aplicativo, quando o anúncio traz um separado. */
+  appUrl?: string | undefined;
   coupon?: string | undefined;
   /** Confiança do modelo, para descartar leitura duvidosa. */
   confianca: "alta" | "media" | "baixa";
@@ -47,6 +50,7 @@ const respostaSchema = z.object({
   storeName: z.string().optional(),
   categorySlug: z.string().optional(),
   url: z.string().optional(),
+  appUrl: z.string().optional(),
   coupon: z.string().optional(),
   confianca: z.enum(["alta", "media", "baixa"]).optional(),
 });
@@ -76,6 +80,12 @@ const INSTRUCAO = [
   "- Converta \"1,8k\" e \"1.8k\" para 1800. Vírgula é decimal: \"1.799,90\" é",
   "  1799.90.",
   "- `url` só se houver link na mensagem. Não invente.",
+  "",
+  "Alguns anúncios trazem DOIS links, um para cada jeito de comprar:",
+  '  "Link App com desconto em moedas" -> `appUrl`',
+  '  "Link para PC / sem super desconto moedas" -> `url`',
+  "Quando houver os dois, preencha os dois — eles levam a preços diferentes,",
+  "e o do app costuma ser o mais barato. Com um link só, use `url`.",
   "- `confianca: baixa` quando o preço ou o produto estiverem ambíguos.",
   "",
   `Categorias válidas: ${CATEGORIAS.join(", ")}.`,
@@ -97,7 +107,14 @@ const SCHEMA_DE_RESPOSTA = {
     regularPrice: { type: "number", description: "Preço anterior, se declarado" },
     storeName: { type: "string", description: "Loja, se mencionada" },
     categorySlug: { type: "string", enum: [...CATEGORIAS] },
-    url: { type: "string" },
+    url: {
+      type: "string",
+      description: "Link para computador, ou o único link quando só houver um",
+    },
+    appUrl: {
+      type: "string",
+      description: "Link do aplicativo, só quando o anúncio trouxer um à parte",
+    },
     coupon: { type: "string" },
     confianca: { type: "string", enum: ["alta", "media", "baixa"] },
   },
@@ -166,6 +183,7 @@ export async function extrairPromocao(
     storeName: dados.storeName,
     categorySlug: dados.categorySlug,
     url: dados.url,
+    appUrl: dados.appUrl,
     coupon: dados.coupon,
     confianca: dados.confianca ?? "media",
   };

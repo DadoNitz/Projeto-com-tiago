@@ -280,6 +280,7 @@ export async function coletarPromocoes({
           storeName: extraida.storeName,
           categorySlug: extraida.categorySlug,
           url: extraida.url,
+          appUrl: extraida.appUrl,
           coupon: extraida.coupon,
         },
         // A trilha registra "sistema", nao uma pessoa: quem coletou foi o

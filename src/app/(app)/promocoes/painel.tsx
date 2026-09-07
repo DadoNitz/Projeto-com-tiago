@@ -1,9 +1,18 @@
 "use client";
 
-import { Archive, Download, Loader2, Plus, Sparkles, Tag } from "lucide-react";
+import {
+  Archive,
+  Download,
+  Loader2,
+  Monitor,
+  Plus,
+  Smartphone,
+  Sparkles,
+  Tag,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -32,6 +41,8 @@ export interface PromocaoNaTela {
   cashback: number | null;
   cupom: string | null;
   url: string | null;
+  /** Link do aplicativo, quando a oferta tem um separado do de PC. */
+  urlApp: string | null;
   nota: number | null;
   veredito: string | null;
   vistaEm: Date;
@@ -56,6 +67,18 @@ const FILTROS: { chave: Segmento | "tudo"; rotulo: string }[] = [
   { chave: "tudo", rotulo: "Tudo" },
 ];
 
+/**
+ * Este navegador parece ser de celular?
+ *
+ * Serve só para decidir QUAL link aparece primeiro — os dois continuam
+ * clicáveis. Por isso o palpite grosseiro basta: errar troca a ordem de dois
+ * botões, não impede ninguém de comprar.
+ */
+function pareceCelular(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+}
+
 export function PainelDePromocoes({
   promocoes,
   segmento,
@@ -78,6 +101,14 @@ export function PainelDePromocoes({
   const [executando, iniciar] = useTransition();
   const [avaliando, setAvaliando] = useState<string | null>(null);
   const [coletando, setColetando] = useState(false);
+
+  // Definido depois da hidratação: no servidor não existe `navigator`, e ler
+  // ali faria o HTML divergir do que o cliente renderiza.
+  const [noCelular, setNoCelular] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- só pode ser lido no cliente
+    setNoCelular(pareceCelular());
+  }, []);
   const [referencias, setReferencias] = useState<Record<string, Referencia[]>>({});
 
   const [campos, setCampos] = useState({
@@ -345,19 +376,57 @@ export function PainelDePromocoes({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="font-medium">
-                      {promocao.url ? (
+                      {(() => {
+                        // No celular o link do app vem primeiro; no PC, o de
+                        // computador. Cai no que existir quando só houver um.
+                        const principal = noCelular
+                          ? (promocao.urlApp ?? promocao.url)
+                          : (promocao.url ?? promocao.urlApp);
+
+                        return principal ? (
+                          <a
+                            href={principal}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:underline"
+                          >
+                            {promocao.titulo}
+                          </a>
+                        ) : (
+                          promocao.titulo
+                        );
+                      })()}
+                    </h3>
+
+                    {/*
+                      Com dois links, os dois aparecem — e o do app vem
+                      marcado. Ele nao e "a versao celular do mesmo link": leva
+                      a um preco menor, com desconto em moedas que o link de PC
+                      nao tem. Esconder um deles faria a pessoa pagar mais sem
+                      saber que havia opcao.
+                    */}
+                    {promocao.url && promocao.urlApp ? (
+                      <div className="mt-1.5 flex flex-wrap gap-2">
+                        <a
+                          href={promocao.urlApp}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
+                        >
+                          <Smartphone className="size-3" aria-hidden />
+                          Abrir no app {noCelular ? "" : "(preço menor)"}
+                        </a>
                         <a
                           href={promocao.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:underline"
+                          className="hover:bg-muted inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
                         >
-                          {promocao.titulo}
+                          <Monitor className="size-3" aria-hidden />
+                          Abrir no computador
                         </a>
-                      ) : (
-                        promocao.titulo
-                      )}
-                    </h3>
+                      </div>
+                    ) : null}
                     <p className="text-muted-foreground text-sm">
                       {promocao.categoria ? `${promocao.categoria} · ` : ""}
                       {promocao.loja ?? "Loja não informada"} ·{" "}

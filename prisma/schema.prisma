@@ -806,7 +806,15 @@ model Promotion {
   currentPrice  Decimal  @db.Decimal(12, 2)
   regularPrice  Decimal? @db.Decimal(12, 2)
   discountPct   Decimal? @db.Decimal(5, 2)
+  /// link para abrir no computador
   url           String?
+  /// link do aplicativo, quando a oferta tem um separado
+  ///
+  /// Não é só "a versão celular do mesmo link": nos canais do AliExpress o
+  /// link do app costuma trazer desconto em moedas que o link de PC não tem,
+  /// e o preço anunciado é o do app. Guardar um só apagaria essa diferença —
+  /// quem abrisse no computador pagaria mais do que a oferta prometia.
+  appUrl        String?
   coupon        String?
   cashbackPct   Decimal? @db.Decimal(5, 2)
   shippingCost  Decimal? @db.Decimal(12, 2)
@@ -829,6 +837,46 @@ model Promotion {
   @@index([active, seenAt])
   @@index([categorySlug, active])
   @@map("promotions")
+}
+
+/// Catálogo público de uma loja, montado a partir do sitemap dela.
+///
+/// Existe porque Pichau e Terabyte proíbem a busca no `robots.txt` (`/busca`
+/// e URLs com query), mas liberam a página do produto e publicam sitemap. O
+/// índice é o que permite achar a URL do produto sem usar a busca proibida:
+/// casa-se o nome pelo slug aqui, e só então busca-se aquela página.
+///
+/// É reconstruído por `npm run precos:indexar`, nunca durante uma requisição.
+model StoreProduct {
+  id        String   @id @default(cuid())
+  storeSlug String
+  name      String
+  url       String
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeSlug, url])
+  @@index([storeSlug, name])
+  @@map("store_products")
+}
+
+/// Preço observado numa loja, com validade curta.
+///
+/// Serve para não repetir a consulta a cada clique em "Avaliar" — o preço de
+/// hoje não muda de minuto em minuto, e a loja não precisa receber a mesma
+/// pergunta duas vezes.
+model StorePrice {
+  id          String   @id @default(cuid())
+  storeSlug   String
+  /// Título normalizado que originou a consulta.
+  query       String
+  productName String
+  url         String
+  price       Decimal  @db.Decimal(12, 2)
+  fetchedAt   DateTime @default(now())
+
+  @@unique([storeSlug, query])
+  @@index([fetchedAt])
+  @@map("store_prices")
 }
 
 model PriceHistory {
