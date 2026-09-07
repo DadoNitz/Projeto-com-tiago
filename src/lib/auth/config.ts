@@ -55,10 +55,16 @@ export const authConfig = {
         // conexão receberia HTML em vez de 204 e declararia o app offline —
         // exatamente o erro que a seção 33 manda evitar. Não revela nada.
         pathname === "/api/health" ||
-        // Disparada pelo agendamento da Vercel, que nao tem sessao. A rota
-        // tem autorizacao propria por segredo compartilhado; deixa-la aqui
-        // seria um gatilho publico de notificacao para toda a equipe.
-        pathname === "/api/cron/alertas" ||
+        // Disparadas pelo agendamento da Vercel, que nao tem sessao.
+        //
+        // E o prefixo inteiro, e nao rota por rota: listar uma a uma ja
+        // custou uma rota nova redirecionada para o login em producao, que
+        // falha como "cron nao roda" — sintoma que nao aponta para a causa.
+        //
+        // Em troca vale um contrato, coberto por teste em
+        // `rotas-publicas.test.ts`: TODA rota sob /api/cron/ se autoriza
+        // sozinha por CRON_SECRET, e recusa quando o segredo nao existe.
+        pathname.startsWith("/api/cron/") ||
         pathname === "/manifest.webmanifest" ||
         pathname === "/sw.js" ||
         pathname === "/offline";
