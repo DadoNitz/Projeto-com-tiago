@@ -2,9 +2,11 @@ import { ArrowLeftRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { buttonVariants } from "@/components/ui/button";
 import type { MovementType } from "@/generated/prisma/enums";
 import { formatarDataHora, formatarMoeda } from "@/lib/format";
 import { MOVIMENTO_DE_SAIDA, ROTULO_MOVIMENTO } from "@/lib/inventory-labels";
+import { linkDaPagina } from "@/lib/paginacao";
 import { listarMovimentacoes } from "@/server/services/movement-history.service";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +66,10 @@ export default async function MovimentacoesPage({
 
       {pagina.itens.length === 0 ? (
         <div className="bg-card flex flex-col items-center gap-2 rounded-lg border px-6 py-16 text-center">
-          <ArrowLeftRight className="text-muted-foreground size-8" aria-hidden />
+          <ArrowLeftRight
+            className="text-muted-foreground size-8"
+            aria-hidden
+          />
           <p className="text-sm">Nenhuma movimentação com este filtro.</p>
         </div>
       ) : (
@@ -118,18 +123,41 @@ export default async function MovimentacoesPage({
         </ol>
       )}
 
-      {pagina.proximoCursor ? (
-        <div className="flex justify-center">
-          <Link
-            href={`/estoque/movimentacoes?${new URLSearchParams({
-              ...(tipoFiltro ? { type: tipoFiltro } : {}),
-              cursor: pagina.proximoCursor,
-            }).toString()}`}
-            className="text-sm underline"
-          >
-            Carregar mais
-          </Link>
-        </div>
+      {/*
+        Era um link sublinhado de ~20px de altura, num app que trata alvo de
+        toque como requisito. Mesmo controle de página da tela de estoque, com
+        o mesmo rótulo honesto: o cursor troca a página, não acrescenta.
+      */}
+      {pagina.proximoCursor || cursor ? (
+        <nav aria-label="Paginação" className="flex justify-center gap-2">
+          {cursor ? (
+            <Link
+              className={buttonVariants({
+                variant: "outline",
+                className: "h-11",
+              })}
+              href={linkDaPagina("/estoque/movimentacoes", params, null)}
+            >
+              Início da lista
+            </Link>
+          ) : null}
+
+          {pagina.proximoCursor ? (
+            <Link
+              className={buttonVariants({
+                variant: "outline",
+                className: "h-11",
+              })}
+              href={linkDaPagina(
+                "/estoque/movimentacoes",
+                params,
+                pagina.proximoCursor,
+              )}
+            >
+              Próxima página
+            </Link>
+          ) : null}
+        </nav>
       ) : null}
     </div>
   );
@@ -149,7 +177,9 @@ function FiltroTipo({
       href={href}
       className={cn(
         "rounded-full border px-3 py-1.5 text-xs transition-colors",
-        ativo ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted",
+        ativo
+          ? "bg-primary text-primary-foreground border-primary"
+          : "hover:bg-muted",
       )}
     >
       {children}

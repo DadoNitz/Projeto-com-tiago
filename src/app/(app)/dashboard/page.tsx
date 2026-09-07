@@ -5,11 +5,7 @@ import Link from "next/link";
 import { Icone } from "@/components/layout/icon";
 import { StatCard } from "@/components/shared/stat-card";
 import { ConditionBadge, StatusBadge } from "@/components/shared/status-badge";
-import {
-  formatarData,
-  formatarMoeda,
-  formatarNumero,
-} from "@/lib/format";
+import { formatarData, formatarMoeda, formatarNumero } from "@/lib/format";
 import {
   alertasDeEstoqueBaixo,
   itensQuePrecisamDeAtencao,
@@ -97,46 +93,64 @@ export default async function DashboardPage() {
             </Link>
           </header>
 
-          <ul className="divide-y">
-            {categorias.map((categoria) => {
-              // Barra proporcional à maior categoria: dá a leitura relativa
-              // sem precisar de biblioteca de gráfico nesta tela.
-              const maior = categorias[0]?.unidades ?? 1;
-              const proporcao = Math.max(
-                4,
-                Math.round((categoria.unidades / maior) * 100),
-              );
+          {/*
+            Estoque vazio deixava um cartão com título e nada embaixo — a
+            leitura de quem abre o sistema pela primeira vez é de tela
+            quebrada, não de estoque zerado. O bloco de alertas ao lado já
+            resolvia isso; estas duas listas, não.
+          */}
+          {categorias.length === 0 ? (
+            <p className="text-muted-foreground px-4 py-6 text-center text-sm">
+              Nenhuma categoria com peça em estoque ainda.{" "}
+              <Link href="/estoque/novo" className="underline">
+                Adicionar a primeira
+              </Link>
+              .
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {categorias.map((categoria) => {
+                // Barra proporcional à maior categoria: dá a leitura relativa
+                // sem precisar de biblioteca de gráfico nesta tela.
+                const maior = categorias[0]?.unidades ?? 1;
+                const proporcao = Math.max(
+                  4,
+                  Math.round((categoria.unidades / maior) * 100),
+                );
 
-              return (
-                <li key={categoria.id}>
-                  <Link
-                    href={`/estoque/itens?categoryId=${categoria.id}`}
-                    className="hover:bg-muted/50 flex items-center gap-3 px-4 py-3 transition-colors"
-                  >
-                    <Icone
-                      nome={categoria.icon}
-                      className="text-muted-foreground size-4 shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="truncate text-sm">{categoria.name}</span>
-                        <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                          {formatarNumero(categoria.disponiveis)} disp. ·{" "}
-                          {formatarMoeda(categoria.valor)}
-                        </span>
+                return (
+                  <li key={categoria.id}>
+                    <Link
+                      href={`/estoque/itens?categoryId=${categoria.id}`}
+                      className="hover:bg-muted/50 flex items-center gap-3 px-4 py-3 transition-colors"
+                    >
+                      <Icone
+                        nome={categoria.icon}
+                        className="text-muted-foreground size-4 shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="truncate text-sm">
+                            {categoria.name}
+                          </span>
+                          <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                            {formatarNumero(categoria.disponiveis)} disp. ·{" "}
+                            {formatarMoeda(categoria.valor)}
+                          </span>
+                        </div>
+                        <div className="bg-muted mt-1.5 h-1.5 overflow-hidden rounded-full">
+                          <div
+                            className="bg-primary h-full rounded-full"
+                            style={{ width: `${proporcao}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="bg-muted mt-1.5 h-1.5 overflow-hidden rounded-full">
-                        <div
-                          className="bg-primary h-full rounded-full"
-                          style={{ width: `${proporcao}%` }}
-                        />
-                      </div>
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
 
         <div className="space-y-4">
@@ -197,31 +211,39 @@ export default async function DashboardPage() {
             <header className="border-b px-4 py-3">
               <h2 className="text-sm font-medium">Últimas adicionadas</h2>
             </header>
-            <ul className="divide-y">
-              {entradas.map((unidade) => (
-                <li key={unidade.id}>
-                  <Link
-                    href={`/estoque/itens/${unidade.id}`}
-                    className="hover:bg-muted/50 flex items-center gap-3 px-4 py-3 transition-colors"
-                  >
-                    <Icone
-                      nome={unidade.product.category.icon}
-                      className="text-muted-foreground size-4 shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm">{unidade.product.name}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {formatarData(unidade.entryDate)}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <StatusBadge status={unidade.status} />
-                      <ConditionBadge condition={unidade.condition} />
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {entradas.length === 0 ? (
+              <p className="text-muted-foreground px-4 py-6 text-center text-sm">
+                Nenhuma peça cadastrada até agora.
+              </p>
+            ) : (
+              <ul className="divide-y">
+                {entradas.map((unidade) => (
+                  <li key={unidade.id}>
+                    <Link
+                      href={`/estoque/itens/${unidade.id}`}
+                      className="hover:bg-muted/50 flex items-center gap-3 px-4 py-3 transition-colors"
+                    >
+                      <Icone
+                        nome={unidade.product.category.icon}
+                        className="text-muted-foreground size-4 shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm">
+                          {unidade.product.name}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {formatarData(unidade.entryDate)}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <StatusBadge status={unidade.status} />
+                        <ConditionBadge condition={unidade.condition} />
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         </div>
       </div>

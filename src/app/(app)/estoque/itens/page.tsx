@@ -6,6 +6,7 @@ import { Icone } from "@/components/layout/icon";
 import { ConditionBadge, StatusBadge } from "@/components/shared/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { formatarData, formatarMoeda, formatarNumero } from "@/lib/format";
+import { linkDaPagina } from "@/lib/paginacao";
 import { filtroEstoqueSchema } from "@/lib/validation/inventory";
 import {
   listarMarcas,
@@ -15,6 +16,7 @@ import {
 import { listarUnidades } from "@/server/services/inventory.service";
 
 import { Filtros } from "./filtros";
+import { LinhaClicavel } from "./linha-clicavel";
 
 export const metadata: Metadata = { title: "Estoque" };
 export const dynamic = "force-dynamic";
@@ -31,9 +33,7 @@ type SearchParams = Record<string, string | string[] | undefined>;
 function lerFiltro(searchParams: SearchParams) {
   const bruto = {
     ...searchParams,
-    status: searchParams.status
-      ? [searchParams.status].flat()
-      : undefined,
+    status: searchParams.status ? [searchParams.status].flat() : undefined,
     condition: searchParams.condition
       ? [searchParams.condition].flat()
       : undefined,
@@ -142,7 +142,9 @@ export default async function EstoquePage({
                         <p className="text-muted-foreground truncate text-xs">
                           {unidade.product.brand?.name ?? "Sem marca"} ·{" "}
                           {unidade.internalCode}
-                          {unidade.serialLast ? ` · ••${unidade.serialLast}` : ""}
+                          {unidade.serialLast
+                            ? ` · ••${unidade.serialLast}`
+                            : ""}
                         </p>
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                           <StatusBadge status={unidade.status} />
@@ -186,7 +188,10 @@ export default async function EstoquePage({
                   </thead>
                   <tbody className="divide-y">
                     {pagina.itens.map((unidade) => (
-                      <tr key={unidade.id} className="hover:bg-muted/40">
+                      <LinhaClicavel
+                        key={unidade.id}
+                        href={`/estoque/itens/${unidade.id}`}
+                      >
                         <td className="px-4 py-2.5">
                           <Link
                             href={`/estoque/itens/${unidade.id}`}
@@ -239,32 +244,52 @@ export default async function EstoquePage({
                             </span>
                           ) : null}
                         </td>
-                      </tr>
+                      </LinhaClicavel>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              {pagina.proximoCursor ? (
-                <div className="mt-4 flex justify-center">
-                  <Link
-                    className={buttonVariants({
-                      variant: "outline",
-                      className: "h-11",
-                    })}
-                    href={`/estoque/itens?${new URLSearchParams({
-                        ...Object.fromEntries(
-                          Object.entries(params).filter(
-                            ([chave, valor]) =>
-                              chave !== "cursor" && typeof valor === "string",
-                          ) as [string, string][],
-                        ),
-                      cursor: pagina.proximoCursor,
-                    }).toString()}`}
-                  >
-                    Carregar mais
-                  </Link>
-                </div>
+              {/*
+                "Carregar mais" prometia acúmulo que não acontece: a paginação
+                é por cursor, então o clique troca a página inteira e as peças
+                anteriores somem. Os rótulos agora dizem o que os links fazem,
+                e existe caminho de volta — antes, quem avançava só voltava
+                pelo botão do navegador.
+              */}
+              {pagina.proximoCursor || filtro.cursor ? (
+                <nav
+                  aria-label="Paginação"
+                  className="mt-4 flex justify-center gap-2"
+                >
+                  {filtro.cursor ? (
+                    <Link
+                      className={buttonVariants({
+                        variant: "outline",
+                        className: "h-11",
+                      })}
+                      href={linkDaPagina("/estoque/itens", params, null)}
+                    >
+                      Início da lista
+                    </Link>
+                  ) : null}
+
+                  {pagina.proximoCursor ? (
+                    <Link
+                      className={buttonVariants({
+                        variant: "outline",
+                        className: "h-11",
+                      })}
+                      href={linkDaPagina(
+                        "/estoque/itens",
+                        params,
+                        pagina.proximoCursor,
+                      )}
+                    >
+                      Próxima página
+                    </Link>
+                  ) : null}
+                </nav>
               ) : null}
             </>
           )}
