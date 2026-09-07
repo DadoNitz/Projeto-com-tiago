@@ -294,7 +294,14 @@ export async function avaliarPromocao(
     .join("\n");
 
   try {
-    const provider = aiProvider();
+    // Quem pediu decide o modelo, e portanto de qual cota diária sai.
+    //
+    // Coleta automática é trabalho de fundo: vai para o modelo de lote, com
+    // cota própria. Pessoa clicando "Avaliar" está esperando na tela e usa o
+    // modelo bom. Sem esta distinção o bot consumiria, a cada oferta que
+    // registra, uma requisição da mesma cota que a leitura de etiqueta usa —
+    // e um dia movimentado no grupo deixaria o cadastro de peça sem IA.
+    const provider = aiProvider(ctx.userId === null ? "lote" : "interativo");
     const resposta = await provider.gerar({
       sistema: INSTRUCAO,
       mensagens: [{ papel: "user", texto: contexto }],

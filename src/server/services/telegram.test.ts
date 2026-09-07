@@ -85,6 +85,10 @@ const OFERTA = "🔥 RTX 4060 por R$ 1.799 na Kabum";
 const CONVERSA = "bom dia pessoal, tudo certo por aí?";
 
 beforeEach(() => {
+  // Limpa o histórico de chamadas, não as implementações: sem isto um teste
+  // conta as chamadas dos anteriores junto.
+  vi.clearAllMocks();
+
   configuracoes.clear();
   chamadasDeIA.length = 0;
   promocoesRegistradas = [];
@@ -207,5 +211,25 @@ describe("erro no meio do ciclo", () => {
     // numa mensagem problemática pararia a coleta para sempre.
     expect(resultado.erros).toBe(1);
     expect(resultado.promocoesNovas).toBe(1);
+  });
+});
+
+describe("de qual cota a coleta gasta", () => {
+  it("avalia pelo modelo de lote, não pelo interativo", async () => {
+    // Regressão de um defeito real: a avaliação chamava `aiProvider()` sem
+    // argumento e caía no modelo interativo. Cada oferta coletada consumia,
+    // em silêncio, uma requisição da mesma cota diária que a leitura de
+    // etiqueta usa — e num dia movimentado o cadastro de peça ficaria sem IA
+    // por causa do bot.
+    const { avaliarPromocao } = await import("./promotion.service");
+
+    respostaDoTelegram = [mensagem(60, OFERTA)];
+    await coletarPromocoes();
+
+    expect(vi.mocked(avaliarPromocao)).toHaveBeenCalledTimes(1);
+    const [, ator] = vi.mocked(avaliarPromocao).mock.calls[0]!;
+
+    // É o `userId` nulo que faz o serviço escolher o modelo de lote.
+    expect(ator).toMatchObject({ userId: null, origem: "telegram" });
   });
 });
