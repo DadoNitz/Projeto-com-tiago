@@ -51,6 +51,9 @@ registra o que existe, o que ficou de fora e por quê.
 
 - Cadastro de ofertas e histórico de preço (`/promocoes`)
 - Avaliação pela IA comparando com o custo real de compra da operação
+- **Bot de coleta pelo Telegram**, com pré-filtro determinístico e teto de
+  cota (`services/telegram.service.ts`, `/api/cron/promocoes`) — ver seção
+  própria abaixo
 
 ## Decisões que valem ser lembradas
 
@@ -114,11 +117,66 @@ A rota do agendamento é pública no proxy (o agendador não tem sessão) mas te
 autorização própria por segredo. Verificável com `npm run cron:check`, que
 confere as três situações: sem autorização, com segredo errado e com o certo.
 
+## Bot de promoções (Telegram)
+
+Ofertas entram por um grupo de Telegram seu, não por raspagem de site — a
+seção 26 proíbe, e com razão: raspador viola termos de uso, quebra a cada
+mudança de layout e rende bloqueio de IP.
+
+Um bot só lê grupos onde foi adicionado. Essa limitação virou o desenho: você
+encaminha para o grupo do bot as ofertas dos grupos que já acompanha, e o
+sistema faz o resto — extrai, compara com o que você **realmente pagou** na
+peça, e avisa só quando vale a pena.
+
+### Como ligar
+
+1. No Telegram, fale com **@BotFather** e envie `/newbot`.
+2. Copie o token e coloque no `.env`:
+   `TELEGRAM_BOT_TOKEN=123456:ABC-DEF...`
+3. **Desligue o modo privacidade** — este é o passo que quase todo mundo
+   esquece, e sem ele o bot não lê nada:
+   `@BotFather → /mybots → o bot → Bot Settings → Group Privacy → Turn off`
+4. Crie um grupo, adicione o bot. Se já tinha adicionado antes do passo 3,
+   **remova e adicione de novo** — a mudança só vale a partir da nova entrada.
+5. Confira: `npm run telegram`. O script diz exatamente em qual passo parou.
+6. Em produção, defina `TELEGRAM_BOT_TOKEN` também na Vercel.
+
+### Como roda
+
+Uma vez ao dia pelo agendamento (`0 12 * * *` UTC = 9h em São Paulo), e sob
+demanda pelo botão **Buscar ofertas** na tela de promoções.
+
+O `offset` de leitura fica no banco (`AppSetting`), então as duas vias
+convivem: o que uma processou, a outra não relê. E o offset só avança sobre o
+que foi de fato processado — se um ciclo para no meio, as mensagens restantes
+voltam na próxima, em vez de sumirem.
+
+A coleta é registrada na auditoria como ação **do sistema**, com autor nulo.
+Atribuí-la a um administrador diria que uma pessoa fez o que a máquina fez.
+
 ## Restrições operacionais conhecidas
 
-**O plano gratuito do Gemini tem limite por minuto e por dia.** Ao estourar, o
-sistema mostra "limite de requisições atingido" em vez de um erro genérico. Os
-testes que chamam o modelo são opt-in (`TESTAR_IA=1`) exatamente por isso.
+**A camada gratuita do Gemini dá cerca de 20 requisições por dia, por
+modelo.** Medido na chave em uso, não estimado. Três consequências no
+sistema:
+
+- Um **pré-filtro determinístico** (`src/domain/promotions/pre-filtro.ts`)
+  descarta ~9 de 12 mensagens típicas de grupo antes de gastar chamada. Ele
+  erra de propósito para o lado de deixar passar: um falso positivo custa uma
+  chamada, um falso negativo perde uma oferta em silêncio.
+- **Modelos separados por finalidade.** `AI_MODEL` atende quem está esperando
+  na tela (etiqueta, chat, descrição); `AI_MODEL_LOTE` atende o bot de
+  promoções. A cota é contada por modelo, então um dia agitado no grupo não
+  pode derrubar a leitura de etiqueta.
+- Os testes que chamam o modelo são **opt-in** (`TESTAR_IA=1`). Sem isso eles
+  queimavam a cota do dia na suíte normal e falhavam por 429 — uma falha que
+  não diz nada sobre o código.
+
+Ao estourar, o sistema mostra "limite de requisições atingido" em vez de um
+erro genérico.
+
+**O plano Hobby da Vercel permite dois agendamentos, uma execução diária
+cada.** Os dois estão em uso: alertas de estoque e coleta de promoções.
 
 **O Neon suspende o compute quando ocioso.** A primeira consulta depois de um
 tempo parado falha; o sistema repete automaticamente até 3 vezes.
@@ -131,10 +189,11 @@ desenvolvimento. O script de fumaça tem fallback para DNS público.
 ```
 npm run typecheck   # tsc --noEmit
 npm run lint        # eslint
-npm test            # 134 testes (5 de IA são opt-in)
+npm test            # 209 testes (11 de IA e integração são opt-in)
 npm run build       # build de produção
 npm run smoke       # login real + rotas em produção
 npm run cron:check  # autorização e execução do agendamento diário
+npm run telegram    # diagnóstico do bot de promoções
 npm run extrato     # extrato por sócio
 npm run db:check    # DNS, autenticação e permissões do banco
 ```
