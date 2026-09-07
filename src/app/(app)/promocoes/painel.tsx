@@ -48,6 +48,13 @@ export interface PromocaoNaTela {
   vistaEm: Date;
 }
 
+interface PrecoDeLoja {
+  loja: string;
+  produto: string;
+  url: string;
+  preco: number;
+}
+
 interface Referencia {
   nome: string;
   custo: number;
@@ -110,6 +117,9 @@ export function PainelDePromocoes({
     setNoCelular(pareceCelular());
   }, []);
   const [referencias, setReferencias] = useState<Record<string, Referencia[]>>({});
+  const [precosDeLoja, setPrecosDeLoja] = useState<Record<string, PrecoDeLoja[]>>(
+    {},
+  );
 
   const [campos, setCampos] = useState({
     title: "",
@@ -200,6 +210,10 @@ export function PainelDePromocoes({
       setReferencias((atual) => ({
         ...atual,
         [id]: resultado.data.referencias,
+      }));
+      setPrecosDeLoja((atual) => ({
+        ...atual,
+        [id]: resultado.data.precosDeLoja,
       }));
       router.refresh();
     });
@@ -459,6 +473,25 @@ export function PainelDePromocoes({
                       {(promocao.nota ?? 0) >= 7 ? "vale comprar" : "não compensa"}
                     </p>
                     <p>{promocao.veredito}</p>
+
+                    {precosDeLoja[promocao.id]?.length ? (
+                      <ul className="mt-2 space-y-0.5 text-xs opacity-90">
+                        {precosDeLoja[promocao.id]!.map((preco) => (
+                          <li key={preco.loja}>
+                            {preco.loja}:{" "}
+                            <a
+                              href={preco.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline"
+                            >
+                              {formatarMoeda(preco.preco)}
+                            </a>{" "}
+                            hoje
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
 
                     {referencias[promocao.id]?.length ? (
                       <ul className="mt-2 space-y-0.5 text-xs opacity-90">

@@ -13,7 +13,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { Confianca, SugestaoDePreco } from "@/domain/pricing/preco-de-venda";
+import { formatarMoeda } from "@/lib/format";
+import {
+  sugerirPrecoDaMontagem,
+  sugerirPrecoDaPeca,
+} from "@/server/actions/pricing.actions";
 import { cn } from "@/lib/utils";
 
 interface Anuncio {
@@ -30,12 +37,30 @@ const CANAIS = [
   { valor: "INSTAGRAM", rotulo: "Instagram" },
 ] as const;
 
+const ROTULO_CONFIANCA: Record<Confianca, string> = {
+  alta: "boa base de dados",
+  media: "dados parciais",
+  baixa: "dados fracos",
+};
+
+const COR_CONFIANCA: Record<Confianca, string> = {
+  alta: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+  media: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+  baixa: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
+};
+
 /**
  * Gera o texto do anúncio a partir dos dados cadastrados.
  *
  * O texto sai como rascunho e é copiado manualmente para a plataforma. O
  * sistema não publica nada sozinho e não guarda credencial de marketplace —
  * publicar em nome de alguém é uma responsabilidade que ele não deve assumir.
+ *
+ * O preço aparece antes do botão de gerar, e não depois, porque ele é decisão
+ * de quem vende: o texto se escreve em torno do valor. A sugestão vem de conta
+ * feita no servidor sobre custo, preço estimado das peças e vendas anteriores
+ * (`@/domain/pricing/preco-de-venda`) — a IA recebe o número já decidido e
+ * nunca opina sobre ele.
  */
 export function GerarAnuncio({
   unitId,
@@ -52,6 +77,68 @@ export function GerarAnuncio({
   const [anuncio, setAnuncio] = useState<Anuncio | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
 
+  const [sugestao, setSugestao] = useState<SugestaoDePreco | null>(null);
+  const [calculando, setCalculando] = useState(false);
+  const [semSugestao, setSemSugestao] = useState<string | null>(null);
+  const [preco, setPreco] = useState(
+    precoSugerido && precoSugerido > 0 ? String(Math.round(precoSugerido)) : "",
+  );
+  /**
+   * Trava o campo contra a sugestão.
+   *
+   * Já nasce travado quando existe preço decidido — o pretendido da montagem,
+   * o estimado da peça. Aquele número foi alguém que digitou; a sugestão é
+   * conta de máquina, e não deve passar por cima de uma decisão que já foi
+   * tomada. Ela continua visível ao lado, que é o que serve para reconsiderar.
+   */
+  const [precoTocado, setPrecoTocado] = useState(
+    Boolean(precoSugerido && precoSugerido > 0),
+  );
+
+  /**
+   * Busca a sugestão ao abrir o diálogo.
+   *
+   * Ao abrir, e não ao montar: é uma consulta ao banco por montagem, e a tela
+   * "Minhas montagens" renderiza este componente uma vez por linha. Calcular
+   * todas de antemão custaria dezenas de consultas para um número que quase
+   * sempre ninguém vai olhar.
+   */
+  async function abrir(estado: boolean) {
+    setAberto(estado);
+    if (!estado || sugestao || calculando || semSugestao) return;
+
+    setCalculando(true);
+
+    const resultado = buildId
+      ? await sugerirPrecoDaMontagem({ id: buildId })
+      : unitId
+        ? await sugerirPrecoDaPeca({ id: unitId })
+        : null;
+
+    setCalculando(false);
+
+    if (!resultado || !resultado.ok) {
+      setSemSugestao(
+        resultado && !resultado.ok
+          ? resultado.error
+          : "Não foi possível calcular agora.",
+      );
+      return;
+    }
+
+    if (!resultado.data) {
+      setSemSugestao(
+        "As peças não têm custo nem preço de venda cadastrados, então não há " +
+          "como sugerir um valor. Preencha o preço à mão.",
+      );
+      return;
+    }
+
+    setSugestao(resultado.data);
+    // O valor do anúncio já vem com o espaço de negociação embutido.
+    if (!precoTocado) setPreco(String(resultado.data.anuncio));
+  }
+
   async function gerar() {
     setGerando(true);
     setAnuncio(null);
@@ -60,7 +147,12 @@ export function GerarAnuncio({
       const resposta = await fetch("/api/ia/anuncio", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ unitId, buildId, canal, preco: precoSugerido }),
+        body: JSON.stringify({
+          unitId,
+          buildId,
+          canal,
+          preco: paraValor(preco) ?? precoSugerido,
+        }),
       });
 
       const dados: { anuncio?: Anuncio; erro?: string } = await resposta.json();
@@ -95,22 +187,92 @@ export function GerarAnuncio({
   }
 
   return (
-    <Dialog open={aberto} onOpenChange={setAberto}>
+    <Dialog open={aberto} onOpenChange={(estado) => void abrir(estado)}>
       <DialogTrigger render={<Button variant="outline" className="h-11" />}>
         <Megaphone className="size-4" aria-hidden />
-        Gerar anúncio
+        Anunciar
       </DialogTrigger>
 
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Gerar anúncio de venda</DialogTitle>
+          <DialogTitle>Anunciar</DialogTitle>
           <DialogDescription>
-            O texto usa só as especificações cadastradas. Confira antes de
-            publicar — o sistema não publica nada sozinho.
+            O texto usa só as especificações cadastradas e o valor que você
+            confirmar aqui. Confira antes de publicar — o sistema não publica
+            nada sozinho.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 px-4 pb-4">
+          <section className="rounded-lg border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-medium">Sugestão de valor</h3>
+              {sugestao ? (
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-xs font-medium",
+                    COR_CONFIANCA[sugestao.confianca],
+                  )}
+                >
+                  {ROTULO_CONFIANCA[sugestao.confianca]}
+                </span>
+              ) : null}
+            </div>
+
+            {calculando ? (
+              <p className="text-muted-foreground mt-2 flex items-center gap-2 text-sm">
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                Calculando pelo custo das peças e pelas vendas anteriores…
+              </p>
+            ) : sugestao ? (
+              <>
+                <dl className="mt-2 grid grid-cols-3 gap-2 text-center">
+                  <Valor
+                    rotulo="Anuncie por"
+                    valor={sugestao.anuncio}
+                    destaque
+                  />
+                  <Valor rotulo="Espere fechar" valor={sugestao.alvo} />
+                  <Valor rotulo="Não aceite menos" valor={sugestao.minimo} />
+                </dl>
+
+                <ul className="text-muted-foreground mt-3 space-y-1 text-xs">
+                  {sugestao.custo > 0 ? (
+                    <li>
+                      As peças custaram {formatarMoeda(sugestao.custo)}.
+                    </li>
+                  ) : null}
+                  {sugestao.motivos.map((motivo) => (
+                    <li key={motivo}>{motivo}</li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="text-muted-foreground mt-2 text-sm">
+                {semSugestao ?? "Abra para calcular."}
+              </p>
+            )}
+
+            <div className="mt-3 space-y-1.5">
+              <Label htmlFor="anuncio-preco">Valor no anúncio</Label>
+              <Input
+                id="anuncio-preco"
+                inputMode="decimal"
+                className="h-11"
+                value={preco}
+                onChange={(evento) => {
+                  setPrecoTocado(true);
+                  setPreco(evento.target.value);
+                }}
+                placeholder="0,00"
+              />
+              <p className="text-muted-foreground text-xs">
+                É este valor que entra no texto. Em branco, o anúncio sai sem
+                preço.
+              </p>
+            </div>
+          </section>
+
           <fieldset>
             <Label className="mb-2 block">Canal</Label>
             <div className="flex flex-wrap gap-2">
@@ -146,7 +308,7 @@ export function GerarAnuncio({
             ) : anuncio ? (
               "Gerar outra versão"
             ) : (
-              "Gerar texto"
+              "Gerar título e descrição"
             )}
           </Button>
 
@@ -179,6 +341,44 @@ export function GerarAnuncio({
       </DialogContent>
     </Dialog>
   );
+}
+
+function Valor({
+  rotulo,
+  valor,
+  destaque,
+}: {
+  rotulo: string;
+  valor: number;
+  destaque?: boolean;
+}) {
+  return (
+    <div className="bg-muted/50 rounded-md p-2">
+      <dt className="text-muted-foreground text-xs">{rotulo}</dt>
+      <dd
+        className={cn(
+          "tabular-nums",
+          destaque ? "text-base font-semibold" : "text-sm font-medium",
+        )}
+      >
+        {formatarMoeda(valor)}
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * Lê o valor digitado no formato brasileiro.
+ *
+ * "2.590,00" e "2590" precisam dar no mesmo número: o campo aceita o que a
+ * pessoa naturalmente digita, e o ponto aqui é separador de milhar, não
+ * decimal.
+ */
+function paraValor(texto: string): number | undefined {
+  const limpo = texto.trim().replace(/\./g, "").replace(",", ".");
+  if (limpo === "") return undefined;
+  const numero = Number(limpo);
+  return Number.isFinite(numero) && numero > 0 ? numero : undefined;
 }
 
 function BlocoDeTexto({

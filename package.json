@@ -26,6 +26,7 @@
     "telegram:login": "tsx scripts/telegram-login.ts",
     "telegram:canais": "tsx scripts/telegram-canais.ts",
     "telegram:coletar": "tsx scripts/telegram-coletar.ts",
+    "precos:indexar": "tsx scripts/precos-indexar.ts",
     "backup": "tsx scripts/backup.ts",
     "restaurar": "tsx scripts/restaurar.ts"
   },

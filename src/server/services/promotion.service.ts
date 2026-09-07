@@ -11,6 +11,9 @@ import { prisma } from "@/server/db/client";
 import { formatarMoeda } from "@/lib/format";
 import type { Ator } from "@/server/ator";
 
+import { consultarPrecosNasLojas } from "./store-price";
+import type { PrecoDeLoja } from "./store-price";
+
 import { registrarAuditoria } from "./audit.service";
 import { NaoEncontradoError } from "./errors";
 
@@ -269,6 +272,10 @@ export interface AvaliacaoDaPromocao {
   veredito: string;
   /** Peças suas que serviram de comparação. */
   referencias: { nome: string; custo: number; data: string }[];
+  /** Preço da mesma peça nas lojas, quando foi possível consultar. */
+  precosDeLoja: PrecoDeLoja[];
+  /** Lojas que não deram resposta, com o motivo. */
+  lojasNaoConsultadas: { loja: string; motivo: string }[];
 }
 
 const INSTRUCAO = [
@@ -280,13 +287,20 @@ const INSTRUCAO = [
   "",
   "Regras:",
   "- O preço que importa é o TOTAL: preço + frete − cashback.",
+  "- Quando houver preço da mesma peça em Kabum, Pichau ou Terabyte, ele é a",
+  "  referência de mercado: é o que se paga hoje por essa peça, sem esperar",
+  "  promoção. Oferta acima do preço de loja não é oferta. Diga o quanto a",
+  "  oferta está abaixo (ou acima) do menor preço de loja encontrado.",
   "- Se houver referência de quanto a operação já pagou nessa peça, ela é o",
-  "  parâmetro principal. Pagar mais caro que o custo habitual é ruim mesmo",
+  "  parâmetro de margem. Pagar mais caro que o custo habitual é ruim mesmo",
   "  com 40% de desconto anunciado.",
+  "- Os dois parâmetros respondem perguntas diferentes: preço de loja diz se",
+  "  está barato hoje; custo próprio diz se sobra margem. Use os dois quando",
+  "  tiver os dois, e diga qual faltou quando faltar.",
   "- Desconto sobre 'preço normal' informado pela loja não é evidência: lojas",
   "  inflam o preço de referência. Diga isso quando for o caso.",
-  "- Sem referência de custo, seja explícito: diga que não há base de",
-  "  comparação no estoque e que a nota é menos confiável.",
+  "- Sem referência nenhuma (nem loja, nem custo próprio), seja explícito:",
+  "  diga que não há base de comparação e que a nota é menos confiável.",
   "- Nota de 0 a 10. Acima de 7 significa comprar.",
   "- Veredito em no máximo 3 frases.",
 ].join("\n");
@@ -318,7 +332,12 @@ export async function avaliarPromocao(
 
   if (!promocao) throw new NaoEncontradoError("Promoção");
 
-  const referencia = await referenciaDeCusto(promocao.title);
+  // As duas consultas são independentes: uma no banco, outra nas lojas. Em
+  // paralelo, quem espera na tela espera o mais lento, não a soma.
+  const [referencia, consultaDeLojas] = await Promise.all([
+    referenciaDeCusto(promocao.title),
+    consultarPrecosNasLojas(promocao.title),
+  ]);
   const preco = Number(promocao.currentPrice);
   const frete = Number(promocao.shippingCost ?? 0);
   const cashback = (Number(promocao.cashbackPct ?? 0) / 100) * preco;
@@ -331,6 +350,8 @@ export async function avaliarPromocao(
       veredito:
         "IA não configurada. As referências de custo abaixo vêm do seu próprio histórico e já ajudam a decidir.",
       referencias: referencia?.pecas ?? [],
+      precosDeLoja: consultaDeLojas.precos,
+      lojasNaoConsultadas: consultaDeLojas.falhas,
     };
   }
 
@@ -345,6 +366,20 @@ export async function avaliarPromocao(
     cashback > 0 ? `Cashback: ${formatarMoeda(cashback)}` : "",
     promocao.coupon ? `Cupom: ${promocao.coupon}` : "",
     `CUSTO REAL (preço + frete − cashback): ${formatarMoeda(custoReal)}`,
+    "",
+    consultaDeLojas.precos.length > 0
+      ? [
+          "Preço desta peça nas lojas de informática, consultado agora:",
+          ...consultaDeLojas.precos.map(
+            (p) => `  - ${p.loja}: ${formatarMoeda(p.preco)} (${p.produto})`,
+          ),
+        ].join("\n")
+      : "Não foi possível consultar o preço desta peça nas lojas.",
+    consultaDeLojas.falhas.length > 0
+      ? `Lojas sem resposta: ${consultaDeLojas.falhas
+          .map((f) => `${f.loja} (${f.motivo})`)
+          .join(", ")}`
+      : "",
     "",
     referencia
       ? [
@@ -401,7 +436,12 @@ export async function avaliarPromocao(
       ctx,
     );
 
-    return { ...parsed.data, referencias: referencia?.pecas ?? [] };
+    return {
+      ...parsed.data,
+      referencias: referencia?.pecas ?? [],
+      precosDeLoja: consultaDeLojas.precos,
+      lojasNaoConsultadas: consultaDeLojas.falhas,
+    };
   } catch (erro) {
     // Falha da IA não apaga a informação útil que já foi apurada.
     return {
@@ -409,6 +449,8 @@ export async function avaliarPromocao(
       vale: false,
       veredito: `Não foi possível avaliar agora (${erro instanceof Error ? erro.message : "erro"}). As referências de custo abaixo continuam valendo.`,
       referencias: referencia?.pecas ?? [],
+      precosDeLoja: consultaDeLojas.precos,
+      lojasNaoConsultadas: consultaDeLojas.falhas,
     };
   }
 }
