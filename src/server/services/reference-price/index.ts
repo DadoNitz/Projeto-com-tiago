@@ -84,7 +84,10 @@ export async function atualizarPrecoDeReferencia(
   const falhas: DadosDaReferencia["falhas"] = [];
   const porCondicao: Record<Condicao, Anuncio[]> = { USADO: [], NOVO: [] };
 
-  const fontes = FONTES.filter((f) => f.disponivel());
+  const disponiveis = await Promise.all(
+    FONTES.map(async (f) => ((await f.disponivel()) ? f : null)),
+  );
+  const fontes = disponiveis.filter((f) => f !== null);
   await Promise.all(
     fontes.map(async (fonte) => {
       try {

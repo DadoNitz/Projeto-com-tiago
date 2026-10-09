@@ -1,6 +1,7 @@
 import "server-only";
 
 import { env } from "@/lib/env";
+import { prisma } from "@/server/db/client";
 import { baixarPagina } from "@/server/services/store-price/http";
 
 /**
@@ -40,7 +41,7 @@ export interface Anuncio {
 export interface Fonte {
   nome: string;
   /** `false` quando a fonte não está configurada: nem tenta. */
-  disponivel(): boolean;
+  disponivel(): boolean | Promise<boolean>;
   buscar(consulta: string): Promise<Anuncio[]>;
 }
 
@@ -95,19 +96,44 @@ const buscape: Fonte = {
 
 let tokenEmCache: { valor: string; expiraEm: number } | null = null;
 
+/**
+ * Credencial do app do Mercado Livre.
+ *
+ * Variável de ambiente primeiro; na falta dela, a tabela de configuração
+ * (`app_settings`, chaves `ml.client_id` / `ml.client_secret`). A segunda
+ * existe para poder ligar a fonte sem acesso ao painel da hospedagem.
+ */
+async function credencialDoMercadoLivre(): Promise<{
+  id: string;
+  segredo: string;
+} | null> {
+  const { ML_CLIENT_ID, ML_CLIENT_SECRET } = env();
+  if (ML_CLIENT_ID && ML_CLIENT_SECRET) {
+    return { id: ML_CLIENT_ID, segredo: ML_CLIENT_SECRET };
+  }
+  const linhas = await prisma.appSetting.findMany({
+    where: { key: { in: ["ml.client_id", "ml.client_secret"] } },
+  });
+  const valor = (chave: string) => linhas.find((l) => l.key === chave)?.value;
+  const id = valor("ml.client_id");
+  const segredo = valor("ml.client_secret");
+  return id && segredo ? { id, segredo } : null;
+}
+
 async function tokenDoMercadoLivre(): Promise<string> {
   if (tokenEmCache && tokenEmCache.expiraEm > Date.now() + 60_000) {
     return tokenEmCache.valor;
   }
 
-  const { ML_CLIENT_ID, ML_CLIENT_SECRET } = env();
+  const credencial = await credencialDoMercadoLivre();
+  if (!credencial) throw new Error("app do Mercado Livre não configurado");
   const resposta = await fetch("https://api.mercadolibre.com/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "client_credentials",
-      client_id: ML_CLIENT_ID ?? "",
-      client_secret: ML_CLIENT_SECRET ?? "",
+      client_id: credencial.id,
+      client_secret: credencial.segredo,
     }),
     signal: AbortSignal.timeout(10_000),
   });
@@ -139,7 +165,7 @@ const PRODUTOS_DO_CATALOGO = 6;
 
 const mercadoLivre: Fonte = {
   nome: "Mercado Livre",
-  disponivel: () => Boolean(env().ML_CLIENT_ID && env().ML_CLIENT_SECRET),
+  disponivel: async () => (await credencialDoMercadoLivre()) !== null,
   async buscar(consulta) {
     const token = await tokenDoMercadoLivre();
     const cabecalhos = { Authorization: `Bearer ${token}` };
