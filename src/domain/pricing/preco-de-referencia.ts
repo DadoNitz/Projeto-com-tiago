@@ -83,7 +83,7 @@ const COMPOSTOS = [
 ];
 
 /** Anúncio que é peça para conserto ou acessório da peça, não a peça. */
-const DEFEITO_OU_ACESSORIO = [
+const DEFEITO_OU_ACESSORIO = new Set([
   "defeito",
   "com problema",
   "nao liga",
@@ -92,10 +92,36 @@ const DEFEITO_OU_ACESSORIO = [
   "sucata",
   "suporte para",
   "backplate",
-  "dissipador para",
+  "dissipador",
+  "heatsink",
   "cabo para",
   "capa para",
-];
+  "espelho",
+  "chapinha",
+  "io shield",
+  "i o shield",
+  "substituicao",
+  "fita led",
+  "adesivo",
+]);
+
+/**
+ * Palavras que o título precisa ter (ao menos uma) para ser da categoria.
+ *
+ * Sem isto, buscar "Afox" (uma placa-mãe) devolve SSD e placa de vídeo Afox,
+ * e buscar um gabinete devolve a ventoinha "para gabinete" daquela marca.
+ */
+const PALAVRAS_DA_CATEGORIA: Record<string, string[]> = {
+  motherboard: ["placa mae", "placa-mae", "placamae", "motherboard", "mainboard"],
+  gpu: ["placa de video", "geforce", "radeon", "rtx", "gtx", "rx ", "rx5", "rx6", "rx7", "vga"],
+  case: ["gabinete"],
+  psu: ["fonte"],
+  cpu: ["processador", "core i", "ryzen", "xeon", "intel core", "pentium", "celeron", "athlon"],
+  ram: ["memoria", "ddr3", "ddr4", "ddr5", "ram"],
+  storage: ["ssd", "hd ", "hdd", "nvme", "m 2", "disco"],
+  cooler: ["cooler", "water", "watercooler", "air cooler"],
+  fan: ["fan", "ventoinha", "cooler"],
+};
 
 export type Rigor = "estrito" | "aproximado";
 
@@ -105,11 +131,15 @@ export type Rigor = "estrito" | "aproximado";
  * - `estrito`: todos os números da consulta (modelo, capacidade) aparecem.
  * - `aproximado`: basta o primeiro número (o modelo principal) — usado quando
  *   o estrito não acha nada, e marcado como aproximado na tela.
+ *
+ * `categoria` é o slug da categoria do produto; quando informada, o título
+ * precisa ser daquela categoria.
  */
 export function anuncioRelevante(
   consulta: string,
   titulo: string,
   rigor: Rigor = "estrito",
+  categoria?: string,
 ): boolean {
   const tituloNormal = normalizar(titulo);
   const consultaNormal = normalizar(consulta);
@@ -118,7 +148,19 @@ export function anuncioRelevante(
   const procuraComposto = COMPOSTOS.some((c) => consultaNormal.includes(c));
   if (ehComposto && !procuraComposto) return false;
 
-  if (DEFEITO_OU_ACESSORIO.some((d) => tituloNormal.includes(d))) return false;
+  if ([...DEFEITO_OU_ACESSORIO].some((d) => tituloNormal.includes(d))) {
+    return false;
+  }
+
+  const exigidasDaCategoria = categoria
+    ? PALAVRAS_DA_CATEGORIA[categoria]
+    : undefined;
+  if (
+    exigidasDaCategoria &&
+    !exigidasDaCategoria.some((p) => `${tituloNormal} `.includes(p))
+  ) {
+    return false;
+  }
 
   const procurados = tokens(consulta);
   if (procurados.length === 0) return false;
@@ -127,6 +169,20 @@ export function anuncioRelevante(
   // Título de anúncio escreve "rx580" e "rx 580" com a mesma frequência.
   const colado = tituloNormal.replace(/\s+/g, "");
   const aparece = (t: string) => doTitulo.has(t) || colado.includes(t);
+
+  // Acessório: "Cooler Fan PARA Gabinete Aigo", "Dissipador P/ Placa H310M".
+  // Quando "para"/"p" vem antes da primeira palavra procurada, o anúncio é de
+  // uma coisa feita para a peça, não da peça.
+  const palavras = tituloNormal.split(" ");
+  const primeiraProcurada = palavras.findIndex((p) => procurados.includes(p));
+  const indicePara = palavras.findIndex((p) => p === "para" || p === "p");
+  if (
+    indicePara !== -1 &&
+    primeiraProcurada !== -1 &&
+    indicePara < primeiraProcurada
+  ) {
+    return false;
+  }
 
   const modelos = tokensDeModelo(procurados);
   const exigidos = rigor === "estrito" ? modelos : modelos.slice(0, 1);

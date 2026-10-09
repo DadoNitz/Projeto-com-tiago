@@ -43,6 +43,13 @@ const ANUNCIOS_GUARDADOS = 10;
 /** Mínimo de anúncios de usado para preferir o usado à loja. */
 const MINIMO_DE_USADOS = 2;
 
+/**
+ * Mínimo de anúncios para publicar uma média. Com um ou dois, a "média" é o
+ * preço de um vendedor qualquer — testado: uma RX 6600 XT saiu a R$ 4.650 com
+ * um anúncio só.
+ */
+const MINIMO_PARA_MEDIA = 3;
+
 /** Pausa entre produtos no lote: não metralhar as fontes. */
 const PAUSA_ENTRE_PRODUTOS_MS = 1_500;
 
@@ -55,10 +62,11 @@ const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function filtrar(
   consulta: string,
   anuncios: Anuncio[],
+  categoria: string,
 ): { rigor: Rigor; anuncios: Anuncio[] } | null {
   for (const rigor of ["estrito", "aproximado"] as const) {
     const relevantes = anuncios.filter((a) =>
-      anuncioRelevante(consulta, a.titulo, rigor),
+      anuncioRelevante(consulta, a.titulo, rigor, categoria),
     );
     if (relevantes.length > 0) return { rigor, anuncios: relevantes };
   }
@@ -105,18 +113,21 @@ export async function atualizarPrecoDeReferencia(
 
   // Usado é o que interessa (é o que se vende aqui). Loja só entra quando
   // não há usado suficiente — e a tela diz que o número é de peça nova.
-  const usados = filtrar(consulta, porCondicao.USADO);
+  const categoria = produto.category.slug;
+  const usados = filtrar(consulta, porCondicao.USADO, categoria);
   const escolha: { condicao: Condicao; rigor: Rigor; anuncios: Anuncio[] } | null =
     usados && usados.anuncios.length >= MINIMO_DE_USADOS
       ? { condicao: "USADO", ...usados }
       : (() => {
-          const novos = filtrar(consulta, porCondicao.NOVO);
+          const novos = filtrar(consulta, porCondicao.NOVO, categoria);
           return novos ? { condicao: "NOVO" as const, ...novos } : null;
         })();
 
-  const resumo = escolha
+  const calculado = escolha
     ? resumirPrecos(escolha.anuncios.map((a) => a.preco))
     : null;
+  const resumo =
+    calculado && calculado.amostras >= MINIMO_PARA_MEDIA ? calculado : null;
 
   const respondeu = falhas.length < fontes.length;
   const status: StatusDaReferencia = resumo

@@ -41,6 +41,33 @@ describe("anuncioRelevante", () => {
     expect(anuncioRelevante("rx 580 2048sp 8gb", "RX 580 8GB")).toBe(false);
   });
 
+  it("recusa acessório feito para a peça", () => {
+    expect(
+      anuncioRelevante("h310m", "Dissipador de Calor p/ Placa Mãe Asus Prime H310m-e", "estrito", "motherboard"),
+    ).toBe(false);
+    expect(
+      anuncioRelevante("h310m", "Espelho Acabamento Placa Mãe ASUS H310M-A", "estrito", "motherboard"),
+    ).toBe(false);
+    expect(
+      anuncioRelevante("aigo", "Cooler Fan Para Gabinete Aigo Am12 Pro Rgb", "estrito", "case"),
+    ).toBe(false);
+  });
+
+  it("exige a categoria do produto no título", () => {
+    expect(
+      anuncioRelevante("afox", "SSD 480GB AFOX SD250-480GN SATA III", "estrito", "motherboard"),
+    ).toBe(false);
+    expect(
+      anuncioRelevante("h310m", "Placa-mãe Goline H310m-g Ddr4 LGA 1151", "estrito", "motherboard"),
+    ).toBe(true);
+  });
+
+  it("'para' depois do nome da peça não é acessório", () => {
+    expect(
+      anuncioRelevante("rx 580 8gb", "Placa de Vídeo RX 580 8GB para jogos", "estrito", "gpu"),
+    ).toBe(true);
+  });
+
   it("no aproximado, basta o modelo principal", () => {
     expect(anuncioRelevante("rx 580 2048sp 8gb", "RX 580 8GB", "aproximado")).toBe(true);
   });
