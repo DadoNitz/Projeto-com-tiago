@@ -245,6 +245,11 @@ header.sticky {
 [data-slot="dialog-header"] {
   padding-right: 2rem;
 }
+/* Filho de grade com texto sem quebra (truncate) não pode alargar a coluna
+   além da tela: no Safari do iPhone isso empurrava cartões pra fora. */
+.app-main .grid > * {
+  min-width: 0;
+}
 .app-main h1 {
   letter-spacing: -0.04em;
   font-weight: 800;

@@ -165,7 +165,7 @@ export default async function EstoquePage({
         </h2>
         {podeEditar && (
           <p className="text-muted-foreground text-xs">
-            Toque no valor para editar
+            Toque na venda para editar
             <span className="hidden lg:inline">
               {" "}
               · Botão direito para mais ações

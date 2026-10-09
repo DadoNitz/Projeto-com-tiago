@@ -162,42 +162,57 @@ export function ListaEstoque({
                         {item.local}
                       </span>
                     </div>
-                    <div className="col-start-1 row-start-3 min-w-0 border-t pt-3 lg:col-start-3 lg:row-start-1 lg:border-0 lg:pt-0 lg:text-right">
+                    {/*
+                      Custo em destaque (é o que vocês conferem), venda
+                      estimada pequena embaixo. O -mr-3/pr-3 no celular
+                      estende a linha divisória por cima do vão da grade,
+                      senão ela aparece partida em duas.
+                    */}
+                    <div className="col-start-1 row-start-3 min-w-0 border-t pt-3 max-lg:-mr-3 max-lg:pr-3 lg:col-start-3 lg:row-start-1 lg:border-0 lg:pt-0 lg:text-right">
                       <span className="text-muted-foreground block text-[11px] lg:hidden">
-                        Venda estimada
-                      </span>
-                      {editavel ? (
-                        <button
-                          type="button"
-                          onClick={() => editar(item)}
-                          className="text-primary -ml-2 inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg px-2 text-base font-semibold tabular-nums hover:bg-primary/8 lg:text-sm"
-                          aria-label={`Editar valor de ${item.nome}`}
-                        >
-                          <span className="break-words">
-                            {item.valor === null
-                              ? "Definir valor"
-                              : formatarMoeda(item.valor)}
-                          </span>
-                          <Pencil className="size-3 shrink-0" aria-hidden />
-                        </button>
-                      ) : (
-                        <span className="block py-2 text-base font-semibold tabular-nums lg:text-sm">
-                          {formatarMoeda(item.valor)}
-                        </span>
-                      )}
-                      <span className="text-muted-foreground block text-[11px] tabular-nums">
-                        Custo{" "}
-                        {item.custo === null ? (
-                          <span className="italic">não informado</span>
-                        ) : (
-                          <span className="text-foreground font-medium">
-                            {formatarMoeda(item.custo)}
-                          </span>
-                        )}
+                        Custo
                         {item.quantidade > 1
                           ? ` · ${item.quantidade} unidades`
                           : ""}
                       </span>
+                      {item.custo === null ? (
+                        <span className="text-muted-foreground block py-1 text-base italic lg:text-sm">
+                          não informado
+                        </span>
+                      ) : (
+                        <span className="block py-1 font-mono text-xl font-semibold tracking-tight tabular-nums lg:text-base">
+                          {formatarMoeda(item.custo)}
+                        </span>
+                      )}
+                      {editavel ? (
+                        <button
+                          type="button"
+                          onClick={() => editar(item)}
+                          className="text-muted-foreground hover:text-foreground -ml-1.5 inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-lg px-1.5 text-xs tabular-nums hover:bg-muted lg:-mr-1.5 lg:ml-0"
+                          aria-label={`Editar valor de venda de ${item.nome}`}
+                        >
+                          <span className="break-words">
+                            Venda{" "}
+                            {item.valor === null ? (
+                              <span className="text-led-text font-semibold">
+                                definir
+                              </span>
+                            ) : (
+                              <span className="text-foreground font-medium">
+                                {formatarMoeda(item.valor)}
+                              </span>
+                            )}
+                          </span>
+                          <Pencil className="size-3 shrink-0" aria-hidden />
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground block py-1 text-xs tabular-nums">
+                          Venda{" "}
+                          <span className="text-foreground font-medium">
+                            {formatarMoeda(item.valor)}
+                          </span>
+                        </span>
+                      )}
                       <PrecoDeMercado
                         referencia={item.referencia}
                         buscando={item.buscandoPreco}

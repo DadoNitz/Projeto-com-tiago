@@ -346,14 +346,20 @@ export function FormularioDeCadastro({
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <ol className="flex items-center gap-1 text-xs" aria-label="Progresso">
+      {/* Grade de colunas iguais: os passos dividem a largura e o texto quebra
+          em vez de empurrar a tela pro lado no celular. */}
+      <ol
+        className="grid gap-1 text-xs"
+        style={{ gridTemplateColumns: `repeat(${passos.length}, minmax(0, 1fr))` }}
+        aria-label="Progresso"
+      >
         {passos.map((item, indice) => (
-          <li key={item.titulo} className="flex flex-1 items-center gap-1">
+          <li key={item.titulo} className="min-w-0">
             <button
               type="button"
               onClick={() => setPasso(indice)}
               className={cn(
-                "flex-1 rounded-md border px-2 py-1.5 transition-colors",
+                "min-h-11 w-full rounded-xl border px-1.5 py-1.5 leading-tight font-medium [overflow-wrap:anywhere] transition-colors",
                 indice === passo
                   ? "border-primary bg-primary text-primary-foreground"
                   : item.valido

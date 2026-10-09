@@ -7,7 +7,12 @@ import { CountUp } from "@/components/motion/count-up";
 import { StatCard } from "@/components/shared/stat-card";
 import { buttonVariants } from "@/components/ui/button";
 import { ConditionBadge, StatusBadge } from "@/components/shared/status-badge";
-import { formatarData, formatarMoeda, formatarNumero } from "@/lib/format";
+import {
+  formatarData,
+  formatarMoeda,
+  formatarMoedaCompacta,
+  formatarNumero,
+} from "@/lib/format";
 import {
   alertasDeEstoqueBaixo,
   itensQuePrecisamDeAtencao,
@@ -32,6 +37,9 @@ export default async function DashboardPage() {
       itensQuePrecisamDeAtencao(5),
     ]);
 
+  // Sem preço de venda definido não existe margem: mostrar "-R$ 5.108" daria
+  // a impressão de prejuízo quando é só falta de preço.
+  const temVenda = resumo.valorEstimado > 0;
   const margem = resumo.valorEstimado - resumo.custoTotal;
 
   return (
@@ -92,8 +100,8 @@ export default async function DashboardPage() {
             <span className="text-hero-muted text-xs">com defeito</span>
           </Link>
           <div className="bg-hero-tile rounded-2xl px-3 py-2.5">
-            <span className="block truncate font-mono text-lg font-semibold">
-              {formatarMoeda(margem)}
+            <span className="block font-mono text-sm leading-7 font-semibold whitespace-nowrap sm:text-lg">
+              {temVenda ? formatarMoedaCompacta(margem) : "—"}
             </span>
             <span className="text-hero-muted text-xs">margem est.</span>
           </div>
@@ -129,19 +137,23 @@ export default async function DashboardPage() {
           destaque={resumo.comDefeito > 0 ? "atencao" : "neutro"}
         />
         <StatCard
-          titulo="Valor do estoque"
-          valor={formatarMoeda(resumo.valorEstimado)}
-          numero={resumo.valorEstimado}
+          titulo="Custo do estoque"
+          valor={formatarMoeda(resumo.custoTotal)}
+          numero={resumo.custoTotal}
           formato="moeda"
-          detalhe={`custo ${formatarMoeda(resumo.custoTotal)} · margem ${formatarMoeda(margem)}`}
+          detalhe={
+            temVenda
+              ? `venda est. ${formatarMoeda(resumo.valorEstimado)} · margem ${formatarMoeda(margem)}`
+              : "venda: sem preço definido"
+          }
           icone="FileBarChart"
         />
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <section
           aria-label="Estoque por categoria"
-          className="bg-card rounded-3xl border lg:col-span-2"
+          className="bg-card min-w-0 rounded-3xl border lg:col-span-2"
         >
           <header className="flex items-center justify-between border-b px-4 py-3">
             <h2 className="text-sm font-medium">Estoque por categoria</h2>
@@ -189,11 +201,11 @@ export default async function DashboardPage() {
                         className="text-muted-foreground size-4 shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span className="truncate text-sm">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                          <span className="min-w-0 truncate text-sm">
                             {categoria.name}
                           </span>
-                          <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                          <span className="text-muted-foreground text-xs tabular-nums">
                             {formatarNumero(categoria.disponiveis)} disp. ·{" "}
                             {formatarMoeda(categoria.valor)}
                           </span>
@@ -213,7 +225,7 @@ export default async function DashboardPage() {
           )}
         </section>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <section aria-label="Alertas" className="bg-card rounded-3xl border">
             <header className="border-b px-4 py-3">
               <h2 className="text-sm font-medium">Alertas</h2>
@@ -247,7 +259,7 @@ export default async function DashboardPage() {
                       className="hover:bg-muted/50 flex gap-3 px-4 py-3 transition-colors"
                     >
                       <AlertTriangle
-                        className="mt-0.5 size-4 shrink-0 text-red-600"
+                        className="mt-0.5 size-4 shrink-0 text-st-alert"
                         aria-hidden
                       />
                       <div className="min-w-0">
@@ -266,7 +278,7 @@ export default async function DashboardPage() {
 
           <section
             aria-label="Últimas peças adicionadas"
-            className="bg-card rounded-lg border"
+            className="bg-card rounded-3xl border"
           >
             <header className="border-b px-4 py-3">
               <h2 className="text-sm font-medium">Últimas adicionadas</h2>
