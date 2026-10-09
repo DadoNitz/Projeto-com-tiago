@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { useActionState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -17,10 +17,10 @@ import { autenticar, type ResultadoLogin } from "@/server/actions/auth.actions";
  * ficar olhando um botão que não responde.
  */
 export function LoginForm() {
-  const [estado, acao, enviando] = useActionState<ResultadoLogin | null, FormData>(
-    autenticar,
-    null,
-  );
+  const [estado, acao, enviando] = useActionState<
+    ResultadoLogin | null,
+    FormData
+  >(autenticar, null);
 
   return (
     <form action={acao} className="space-y-4">
@@ -54,6 +54,37 @@ export function LoginForm() {
           placeholder="••••••••"
         />
       </div>
+
+      {/*
+        Input nativo, e não o Checkbox do Base UI: o formulário funciona sem
+        JavaScript, e o nativo é enviado junto. O label inteiro é o alvo de
+        toque (48px), não só a caixinha.
+      */}
+      <label
+        htmlFor="lembrar"
+        className="hover:bg-muted/60 -mx-2 flex min-h-12 cursor-pointer items-center gap-3 rounded-xl px-2 select-none"
+      >
+        <span className="relative flex size-5 shrink-0">
+          <input
+            id="lembrar"
+            name="lembrar"
+            type="checkbox"
+            defaultChecked
+            className="border-input checked:border-led checked:bg-led peer size-5 shrink-0 cursor-pointer appearance-none rounded-[6px] border-[1.5px] bg-card transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          />
+          <Check
+            aria-hidden
+            strokeWidth={3}
+            className="text-led-foreground pointer-events-none absolute inset-0 m-auto size-3.5 opacity-0 transition-opacity peer-checked:opacity-100"
+          />
+        </span>
+        <span className="flex flex-col">
+          <span className="text-sm font-semibold">Manter conectado</span>
+          <span className="text-muted-foreground text-xs">
+            Desmarque em celular que não é seu: a sessão acaba em 12 horas.
+          </span>
+        </span>
+      </label>
 
       {estado?.error ? (
         <p

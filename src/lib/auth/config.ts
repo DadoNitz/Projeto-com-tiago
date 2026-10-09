@@ -11,8 +11,17 @@ import type { Role } from "@/generated/prisma/enums";
  * middleware) e `src/lib/auth/index.ts` (completo, com o provider Credentials
  * que consulta o banco).
  */
+/** Sessão de quem marca "Manter conectado": renova a cada uso. */
+export const SESSAO_LONGA_SEGUNDOS = 60 * 24 * 60 * 60; // 60 dias
+/** Sessão de quem não marca: acaba depois disso, sem renovar. */
+export const SESSAO_CURTA_MS = 12 * 60 * 60 * 1000; // 12 horas
+
 export const authConfig = {
-  session: { strategy: "jwt" },
+  session: {
+    strategy: "jwt",
+    maxAge: SESSAO_LONGA_SEGUNDOS,
+    updateAge: 24 * 60 * 60,
+  },
   pages: {
     signIn: "/login",
     error: "/login",
@@ -28,6 +37,18 @@ export const authConfig = {
       if (user) {
         token.role = (user as { role?: Role }).role;
         token.userId = user.id;
+        // "Manter conectado" decide a duração. Sem marcar, o prazo é fixo a
+        // partir do login: usar o app não estende, então um celular
+        // emprestado não fica com o estoque aberto por semanas.
+        token.lembrar = user.lembrar !== false;
+        token.expiraEm = token.lembrar ? undefined : Date.now() + SESSAO_CURTA_MS;
+      }
+
+      // Roda também no proxy (Edge) a cada requisição: sessão curta vencida
+      // vira "sem sessão" e a pessoa cai no login.
+      const expiraEm = Number(token.expiraEm ?? 0);
+      if (token.lembrar === false && expiraEm > 0 && Date.now() > expiraEm) {
+        return null;
       }
       return token;
     },

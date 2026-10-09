@@ -13,6 +13,8 @@ import { podeTentar, registrarFalha, registrarSucesso } from "./rate-limit";
 const credenciaisSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  // Vem como texto do formulário: "1" marcado, "0" desmarcado.
+  lembrar: z.enum(["0", "1"]).optional(),
 });
 
 /**
@@ -29,12 +31,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: "E-mail", type: "email" },
         password: { label: "Senha", type: "password" },
+        lembrar: { label: "Manter conectado", type: "text" },
       },
       async authorize(credentials) {
         const parsed = credenciaisSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
-        const { email, password } = parsed.data;
+        const { email, password, lembrar } = parsed.data;
 
         // Limite de tentativas antes de tocar o banco: um ataque de forca
         // bruta nao deve nem gerar consulta, quanto mais o custo do bcrypt.
@@ -70,6 +73,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: usuario.email,
           name: usuario.name,
           role: usuario.role,
+          lembrar: lembrar !== "0",
         };
       },
     }),

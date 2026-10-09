@@ -12,6 +12,8 @@ declare module "next-auth" {
 
   interface User {
     role: Role;
+    /** "Manter conectado" marcado no login. */
+    lembrar?: boolean;
   }
 }
 
@@ -19,6 +21,9 @@ declare module "next-auth/jwt" {
   interface JWT {
     userId?: string;
     role?: Role;
+    lembrar?: boolean;
+    /** Fim da sessão curta (ms), quando "Manter conectado" não foi marcado. */
+    expiraEm?: number;
   }
 }
 
