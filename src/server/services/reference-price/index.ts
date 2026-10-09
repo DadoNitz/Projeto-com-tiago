@@ -88,7 +88,9 @@ export async function atualizarPrecoDeReferencia(
   await Promise.all(
     fontes.map(async (fonte) => {
       try {
-        porCondicao[fonte.condicao].push(...(await fonte.buscar(consulta)));
+        for (const anuncio of await fonte.buscar(consulta)) {
+          porCondicao[anuncio.condicao].push(anuncio);
+        }
       } catch (erro) {
         falhas.push({
           fonte: fonte.nome,

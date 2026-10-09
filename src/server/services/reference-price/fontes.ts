@@ -18,9 +18,10 @@ import { baixarPagina } from "@/server/services/store-price/http";
  * Raspar contornando esses bloqueios é exatamente o que eles pedem para não
  * fazer — e quebra toda semana.
  *
- * - **Mercado Livre (usado)**: pela API oficial, quando há credencial de
- *   aplicativo configurada (`ML_CLIENT_ID` / `ML_CLIENT_SECRET`). É a fonte de
- *   preço de usado.
+ * - **Mercado Livre**: pela API oficial, quando há credencial de aplicativo
+ *   (`ML_CLIENT_ID` / `ML_CLIENT_SECRET`). Só o catálogo é liberado, e ele traz
+ *   quase só oferta de peça nova (ver abaixo); oferta usada, quando aparece,
+ *   entra como usado.
  * - **Buscapé (novo)**: comparador que agrega Kabum, Magalu, Amazon e outras
  *   lojas, e libera a página de busca para robô identificado. Serve de
  *   referência quando não há preço de usado — e a tela diz que é preço de novo.
@@ -38,7 +39,6 @@ export interface Anuncio {
 
 export interface Fonte {
   nome: string;
-  condicao: Condicao;
   /** `false` quando a fonte não está configurada: nem tenta. */
   disponivel(): boolean;
   buscar(consulta: string): Promise<Anuncio[]>;
@@ -57,7 +57,6 @@ interface HitBuscape {
 
 const buscape: Fonte = {
   nome: "Buscapé",
-  condicao: "NOVO",
   disponivel: () => true,
   async buscar(consulta) {
     const url = `https://www.buscape.com.br/search?q=${encodeURIComponent(consulta)}`;
@@ -128,46 +127,68 @@ async function tokenDoMercadoLivre(): Promise<string> {
   return corpo.access_token;
 }
 
+/**
+ * Testado em 09/10/2026 com credencial válida: `/sites/MLB/search` continua
+ * respondendo 403 (a busca de anúncios é restrita a parceiros). O que a API
+ * libera é o catálogo (`/products/search`) e as ofertas de cada produto do
+ * catálogo (`/products/{id}/items`). Essas ofertas são quase sempre de peça
+ * nova — por isso cada anúncio leva a própria condição, e só conta como usado
+ * o que o Mercado Livre disser que é usado.
+ */
+const PRODUTOS_DO_CATALOGO = 6;
+
 const mercadoLivre: Fonte = {
   nome: "Mercado Livre",
-  condicao: "USADO",
   disponivel: () => Boolean(env().ML_CLIENT_ID && env().ML_CLIENT_SECRET),
   async buscar(consulta) {
     const token = await tokenDoMercadoLivre();
-    const url =
-      "https://api.mercadolibre.com/sites/MLB/search?" +
-      new URLSearchParams({ q: consulta, condition: "used", limit: "30" });
+    const cabecalhos = { Authorization: `Bearer ${token}` };
 
-    const resposta = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(12_000),
-      cache: "no-store",
-    });
+    const busca = await fetch(
+      "https://api.mercadolibre.com/products/search?" +
+        new URLSearchParams({ status: "active", site_id: "MLB", q: consulta }),
+      {
+        headers: cabecalhos,
+        signal: AbortSignal.timeout(12_000),
+        cache: "no-store",
+      },
+    );
+    if (!busca.ok) throw new Error(`catálogo recusou (${busca.status})`);
 
-    if (!resposta.ok) {
-      throw new Error(`busca recusada (${resposta.status})`);
-    }
-
-    const corpo = (await resposta.json()) as {
-      results?: {
-        title: string;
-        price: number;
-        permalink: string;
-        condition?: string;
-      }[];
+    const { results: produtos = [] } = (await busca.json()) as {
+      results?: { id: string; name: string }[];
     };
 
-    return (corpo.results ?? [])
-      .filter((r) => r.condition === undefined || r.condition === "used")
-      .map((r) => ({
-        fonte: "Mercado Livre",
-        titulo: r.title,
-        preco: r.price,
-        url: r.permalink,
-        condicao: "USADO" as const,
-      }));
+    const ofertas = await Promise.all(
+      produtos.slice(0, PRODUTOS_DO_CATALOGO).map(async (produto) => {
+        const resposta = await fetch(
+          `https://api.mercadolibre.com/products/${produto.id}/items?limit=20`,
+          {
+            headers: cabecalhos,
+            signal: AbortSignal.timeout(12_000),
+            cache: "no-store",
+          },
+        );
+        // 404 = produto de catálogo sem oferta ativa. Normal, não é falha.
+        if (!resposta.ok) return [];
+        const { results = [] } = (await resposta.json()) as {
+          results?: { item_id: string; price: number; condition?: string }[];
+        };
+        return results.map(
+          (oferta): Anuncio => ({
+            fonte: "Mercado Livre",
+            titulo: produto.name,
+            preco: oferta.price,
+            url: `https://produto.mercadolivre.com.br/${oferta.item_id.replace(/^MLB/, "MLB-")}`,
+            condicao: oferta.condition === "used" ? "USADO" : "NOVO",
+          }),
+        );
+      }),
+    );
+
+    return ofertas.flat();
   },
 };
 
-/** Ordem de preferência: usado primeiro, loja como reserva. */
+/** Todas são consultadas em paralelo; a condição vem de cada anúncio. */
 export const FONTES: Fonte[] = [mercadoLivre, buscape];
