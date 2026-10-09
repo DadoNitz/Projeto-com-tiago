@@ -74,6 +74,12 @@ describe("rotas de agendamento", () => {
   });
 });
 
+describe("landing", () => {
+  it("a página inicial abre sem sessão", () => {
+    expect(liberadaSemSessao("/")).toBe(true);
+  });
+});
+
 describe("rotas privadas continuam privadas", () => {
   it.each([
     "/dashboard",

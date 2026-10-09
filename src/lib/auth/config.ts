@@ -69,6 +69,9 @@ export const authConfig = {
       const { pathname } = request.nextUrl;
 
       const rotaPublica =
+        // Landing pública: apresenta o sistema e leva pro login. Só a raiz
+        // exata; nada abaixo dela.
+        pathname === "/" ||
         pathname === "/login" ||
         pathname.startsWith("/api/auth") ||
         // Checagem de alcançabilidade do servidor. Precisa responder mesmo com

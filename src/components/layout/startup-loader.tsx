@@ -2,6 +2,7 @@
 
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
+import { usePathname } from "next/navigation";
 import { useRef, useState } from "react";
 
 gsap.registerPlugin(useGSAP);
@@ -29,12 +30,12 @@ const CSS_INICIAL = `[data-abertura="vista"] .abertura{display:none}.abertura .a
 export function StartupLoader() {
   const raiz = useRef<HTMLDivElement>(null);
   const [fim, setFim] = useState(false);
+  // A landing ("/") já é a apresentação da marca: lá a abertura não roda, e
+  // conta como vista pra não aparecer de novo ao entrar no sistema.
+  const naLanding = usePathname() === "/";
 
   useGSAP(
     () => {
-      const el = raiz.current;
-      if (!el) return;
-
       const encerrar = () => {
         try {
           sessionStorage.setItem(CHAVE, "1");
@@ -43,6 +44,13 @@ export function StartupLoader() {
         }
         setFim(true);
       };
+
+      if (naLanding) {
+        encerrar();
+        return;
+      }
+      const el = raiz.current;
+      if (!el) return;
 
       if (document.documentElement.dataset.abertura === "vista") {
         setFim(true);
@@ -78,7 +86,7 @@ export function StartupLoader() {
     { scope: raiz },
   );
 
-  if (fim) return null;
+  if (fim || naLanding) return null;
 
   return (
     <>
