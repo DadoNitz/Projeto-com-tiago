@@ -326,3 +326,18 @@ header.sticky {
     scroll-behavior: auto !important;
   }
 }
+
+/* Abertura do app (startup-loader.tsx). */
+[data-abertura="vista"] .abertura {
+  display: none;
+}
+/* Failsafe: se o JavaScript não rodar, o overlay sai sozinho. */
+.abertura {
+  animation: abertura-failsafe 0.4s ease 3s forwards;
+}
+@keyframes abertura-failsafe {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
