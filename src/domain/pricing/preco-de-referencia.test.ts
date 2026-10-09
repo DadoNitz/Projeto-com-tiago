@@ -68,6 +68,15 @@ describe("anuncioRelevante", () => {
     ).toBe(true);
   });
 
+  it("no aproximado, larga frequência mas mantém a capacidade", () => {
+    expect(
+      anuncioRelevante("corsair vengeance lpx ddr4 4gb 3000mhz", "Memória Corsair Vengeance LPX 16GB DDR4 3200MHz", "aproximado", "ram"),
+    ).toBe(false);
+    expect(
+      anuncioRelevante("corsair vengeance lpx ddr4 4gb 3000mhz", "Memória Corsair Vengeance LPX 4GB DDR4 2400MHz", "aproximado", "ram"),
+    ).toBe(true);
+  });
+
   it("no aproximado, basta o modelo principal", () => {
     expect(anuncioRelevante("rx 580 2048sp 8gb", "RX 580 8GB", "aproximado")).toBe(true);
   });

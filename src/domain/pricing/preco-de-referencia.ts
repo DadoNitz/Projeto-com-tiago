@@ -126,6 +126,20 @@ const PALAVRAS_DA_CATEGORIA: Record<string, string[]> = {
 export type Rigor = "estrito" | "aproximado";
 
 /**
+ * Números que o modo aproximado ainda exige.
+ *
+ * Larga o detalhe que loja raramente escreve (frequência "3000mhz", variante
+ * "2048sp") e mantém modelo e capacidade — "RX 580 2048SP 8GB" vira
+ * "580 8gb", e não "qualquer coisa com 580". Sem detalhe para largar, larga o
+ * último número ("B450 Pro4" vira "B450").
+ */
+function modelosAproximados(modelos: string[]): string[] {
+  const semDetalhe = modelos.filter((m) => !/(mhz|sp)$/.test(m));
+  if (semDetalhe.length < modelos.length) return semDetalhe;
+  return modelos.slice(0, Math.max(1, modelos.length - 1));
+}
+
+/**
  * O anúncio é da mesma peça?
  *
  * - `estrito`: todos os números da consulta (modelo, capacidade) aparecem.
@@ -185,7 +199,7 @@ export function anuncioRelevante(
   }
 
   const modelos = tokensDeModelo(procurados);
-  const exigidos = rigor === "estrito" ? modelos : modelos.slice(0, 1);
+  const exigidos = rigor === "estrito" ? modelos : modelosAproximados(modelos);
   if (exigidos.some((m) => !aparece(m))) return false;
 
   const encontrados = procurados.filter(aparece).length;

@@ -64,13 +64,19 @@ function filtrar(
   anuncios: Anuncio[],
   categoria: string,
 ): { rigor: Rigor; anuncios: Anuncio[] } | null {
+  // O estrito vale quando acha o bastante para uma média; senão tenta o
+  // aproximado, e fica com o que achou mais.
+  let melhor: { rigor: Rigor; anuncios: Anuncio[] } | null = null;
   for (const rigor of ["estrito", "aproximado"] as const) {
     const relevantes = anuncios.filter((a) =>
       anuncioRelevante(consulta, a.titulo, rigor, categoria),
     );
-    if (relevantes.length > 0) return { rigor, anuncios: relevantes };
+    if (relevantes.length >= MINIMO_PARA_MEDIA) return { rigor, anuncios: relevantes };
+    if (relevantes.length > (melhor?.anuncios.length ?? 0)) {
+      melhor = { rigor, anuncios: relevantes };
+    }
   }
-  return null;
+  return melhor;
 }
 
 /**
