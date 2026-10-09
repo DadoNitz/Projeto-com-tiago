@@ -55,6 +55,23 @@ const serverEnvSchema = z.object({
    * independentes: o bot nunca rouba a cota de quem está usando o sistema.
    */
   AI_MODEL_LOTE: z.string().default("gemini-3.5-flash-lite"),
+  /**
+   * Modelos tentados, em ordem, quando o principal bate no limite do plano
+   * gratuito. A cota do Gemini é por modelo, então trocar de modelo com a
+   * mesma chave resolve a maior parte dos "limite atingido". Lista separada
+   * por vírgula; vazio desliga a troca.
+   */
+  AI_MODELOS_RESERVA: z
+    .string()
+    .default(
+      "gemini-3.5-flash,gemini-flash-latest,gemini-3.1-flash-lite,gemini-3.5-flash-lite,gemini-flash-lite-latest",
+    )
+    .transform((lista) =>
+      lista
+        .split(",")
+        .map((modelo) => modelo.trim())
+        .filter(Boolean),
+    ),
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),

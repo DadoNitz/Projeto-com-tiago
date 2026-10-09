@@ -57,13 +57,15 @@ export function aiProvider(
   const jaCriada = instancias.get(finalidade);
   if (jaCriada) return jaCriada;
 
-  const { AI_PROVIDER, AI_MODEL, AI_MODEL_LOTE, GEMINI_API_KEY } = env();
+  const { AI_PROVIDER, AI_MODEL, AI_MODEL_LOTE, AI_MODELOS_RESERVA, GEMINI_API_KEY } =
+    env();
 
   if (AI_PROVIDER === "gemini") {
     if (!GEMINI_API_KEY) throw new IANaoConfiguradaError();
     const criada = new GeminiProvider(
       GEMINI_API_KEY,
       finalidade === "lote" ? AI_MODEL_LOTE : AI_MODEL,
+      AI_MODELOS_RESERVA,
     );
     instancias.set(finalidade, criada);
     return criada;

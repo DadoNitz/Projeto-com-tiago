@@ -46,12 +46,29 @@ interface RespostaGemini {
   error?: { message?: string; status?: string };
 }
 
+/**
+ * Por quanto tempo um modelo que respondeu 429 vai para o fim da fila.
+ *
+ * Na camada gratuita a cota é por modelo: quando o principal esgota, os outros
+ * modelos da mesma chave continuam disponíveis. Lembrar do esgotado (por
+ * instância do servidor) evita gastar uma ida e volta nele a cada pedido.
+ */
+const COTA_ESGOTADA_MS = 60_000;
+const esgotadoAte = new Map<string, number>();
+
 export class GeminiProvider implements AIProvider {
   readonly nome = "gemini";
 
+  /**
+   * @param reservas Modelos tentados, em ordem, quando o principal responde
+   *   limite de cota (429), sobrecarga (503) ou não existe mais (404). Todos
+   *   usam a mesma chave e o mesmo formato, então o histórico de ferramentas
+   *   do chat continua válido se a troca acontecer no meio da conversa.
+   */
   constructor(
     private readonly apiKey: string,
     readonly modelo: string,
+    private readonly reservas: readonly string[] = [],
   ) {}
 
   async gerar(pedido: PedidoDeGeracao): Promise<RespostaDaIA> {
@@ -111,7 +128,7 @@ export class GeminiProvider implements AIProvider {
       corpo.systemInstruction = { parts: [{ text: pedido.sistema }] };
     }
 
-    const { resposta, dados } = await this.enviar(corpo);
+    const { resposta, dados, modelo } = await this.enviar(corpo);
 
     if (!resposta.ok) {
       const detalhe = dados.error?.message ?? `HTTP ${resposta.status}`;
@@ -120,7 +137,9 @@ export class GeminiProvider implements AIProvider {
       if (resposta.status === 429) {
         throw new IAIndisponivelError(
           this.nome,
-          "limite de requisições do plano gratuito atingido. Aguarde um minuto",
+          this.reservas.length > 0
+            ? "limite do plano gratuito atingido em todos os modelos disponíveis. Aguarde um minuto"
+            : "limite de requisições do plano gratuito atingido. Aguarde um minuto",
         );
       }
       if (resposta.status === 503) {
@@ -163,7 +182,8 @@ export class GeminiProvider implements AIProvider {
       chamadas,
       historicoBruto: historico,
       provider: this.nome,
-      modelo: this.modelo,
+      // O modelo que de fato respondeu, que pode ser uma reserva.
+      modelo,
       tokensEntrada: dados.usageMetadata?.promptTokenCount,
       tokensSaida: dados.usageMetadata?.candidatesTokenCount,
     };
@@ -206,15 +226,55 @@ export class GeminiProvider implements AIProvider {
    */
   private async enviar(
     corpo: Record<string, unknown>,
+  ): Promise<{ resposta: Response; dados: RespostaGemini; modelo: string }> {
+    const candidatos = [this.modelo, ...this.reservas].filter(
+      (modelo, indice, todos) => todos.indexOf(modelo) === indice,
+    );
+    const agora = Date.now();
+    // Modelo que bateu no limite há pouco vai para o fim da fila: insistir
+    // nele primeiro só gasta tempo de quem está esperando.
+    const ordenados = [
+      ...candidatos.filter((m) => (esgotadoAte.get(m) ?? 0) <= agora),
+      ...candidatos.filter((m) => (esgotadoAte.get(m) ?? 0) > agora),
+    ];
+
+    let ultima: { resposta: Response; dados: RespostaGemini; modelo: string } | null =
+      null;
+
+    for (const modelo of ordenados) {
+      const resultado = await this.enviarAoModelo(corpo, modelo);
+      ultima = { ...resultado, modelo };
+
+      const status = resultado.resposta.status;
+      // 429 = cota daquele modelo; 503 = sobrecarga persistente; 404 = modelo
+      // aposentado pelo Google. Nos três, outro modelo da mesma chave resolve.
+      if (status === 429 || status === 503 || status === 404) {
+        if (status === 429) esgotadoAte.set(modelo, Date.now() + COTA_ESGOTADA_MS);
+        continue;
+      }
+      return ultima;
+    }
+
+    if (!ultima) {
+      throw new IAIndisponivelError(this.nome, "nenhum modelo configurado");
+    }
+    return ultima;
+  }
+
+  private async enviarAoModelo(
+    corpo: Record<string, unknown>,
+    modelo: string,
   ): Promise<{ resposta: Response; dados: RespostaGemini }> {
-    const TENTATIVAS = 3;
+    // Com modelos de reserva, insistir muito num sobrecarregado é pior que
+    // passar para o próximo.
+    const TENTATIVAS = this.reservas.length > 0 ? 2 : 3;
     let resposta: Response | undefined;
     let dados: RespostaGemini | undefined;
 
     for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa += 1) {
       try {
         resposta = await fetch(
-          `${BASE}/models/${encodeURIComponent(this.modelo)}:generateContent`,
+          `${BASE}/models/${encodeURIComponent(modelo)}:generateContent`,
           {
             method: "POST",
             headers: {
