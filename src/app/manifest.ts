@@ -8,8 +8,8 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Estoque de Hardware",
-    short_name: "Estoque",
+    name: "Bancada · estoque e montagens",
+    short_name: "Bancada",
     description:
       "Inventário inteligente de peças de informática: estoque, movimentações e montagens.",
     start_url: "/dashboard",
@@ -17,8 +17,8 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "portrait-primary",
-    background_color: "#ffffff",
-    theme_color: "#ffffff",
+    background_color: "#f2f1ec",
+    theme_color: "#f2f1ec",
     lang: "pt-BR",
     dir: "ltr",
     categories: ["business", "productivity", "utilities"],

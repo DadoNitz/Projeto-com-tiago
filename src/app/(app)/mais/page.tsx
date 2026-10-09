@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react";
 
 import { Icone } from "@/components/layout/icon";
 import { NAVEGACAO } from "@/components/layout/nav-items";
+import { ThemeSegmented } from "@/components/theme/theme-toggle";
 import { can } from "@/lib/auth/permissions";
 import { requireContext } from "@/server/session";
 
@@ -35,18 +36,28 @@ export default async function MaisPage() {
         </p>
       </div>
 
+      <section aria-label="Aparência" className="bg-card space-y-3 rounded-3xl border p-4">
+        <div>
+          <h2 className="text-base font-bold">Aparência</h2>
+          <p className="text-muted-foreground text-sm">
+            Claro, escuro ou igual ao celular.
+          </p>
+        </div>
+        <ThemeSegmented />
+      </section>
+
       <ul className="grid gap-3 sm:grid-cols-2">
         {itens.map((item) =>
           item.disponivel ? (
             <li
               key={item.href}
-              className="bg-card overflow-hidden rounded-2xl border"
+              className="bg-card overflow-hidden rounded-3xl border"
             >
               <Link
                 href={item.href}
                 className="hover:bg-muted/50 flex min-h-14 items-center gap-3 px-4 py-3 transition-colors"
               >
-                <span className="bg-primary/8 text-primary flex size-10 items-center justify-center rounded-xl">
+                <span className="bg-muted text-foreground flex size-10 items-center justify-center rounded-xl">
                   <Icone nome={item.icone} className="size-5" />
                 </span>
                 <span className="flex-1 text-sm font-semibold">

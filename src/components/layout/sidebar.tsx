@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { BrandMark, BrandWordmark } from "@/components/layout/brand";
 import { Icone } from "@/components/layout/icon";
 import { NAVEGACAO, type ItemDeNavegacao } from "@/components/layout/nav-items";
 import type { Role } from "@/generated/prisma/enums";
@@ -22,12 +23,11 @@ export function Sidebar({ role }: { role: Role }) {
   return (
     <aside className="bg-sidebar text-sidebar-foreground sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r lg:flex">
       <div className="flex h-20 items-center gap-2 border-b px-4">
-        <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
-          <Icone nome="CircuitBoard" className="size-5" />
-        </div>
+        <BrandMark className="size-10" />
         <div className="min-w-0">
-          <p className="truncate text-sm leading-tight font-semibold">
-            Estoque de Hardware
+          <BrandWordmark />
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            estoque e montagens
           </p>
         </div>
       </div>
@@ -47,7 +47,7 @@ export function Sidebar({ role }: { role: Role }) {
         <div className="px-3 pt-3">
           <Link
             href="/estoque/novo"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring flex h-11 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            className="bg-led text-led-foreground hover:brightness-95 focus-visible:ring-ring flex h-12 items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition-all active:scale-[0.98] focus-visible:ring-2 focus-visible:outline-none"
           >
             <Plus className="size-4" aria-hidden />
             Adicionar peça

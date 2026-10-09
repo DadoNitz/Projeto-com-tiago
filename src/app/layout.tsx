@@ -1,23 +1,34 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 
 import { StartupLoader } from "@/components/layout/startup-loader";
+import { ThemeProvider } from "@/components/theme/theme-provider";
 
 import { Toaster } from "@/components/ui/sonner";
 
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Títulos: Bricolage Grotesque. Texto: Instrument Sans. Códigos, preços e
+// specs: JetBrains Mono (algarismos tabulares, o que vocês mais conferem).
+const fonteTitulo = Bricolage_Grotesque({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["500", "700", "800"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const fonteTexto = Instrument_Sans({
+  variable: "--font-body",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
-const APP_NAME = "Estoque de Hardware";
+const fonteDados = JetBrains_Mono({
+  variable: "--font-data",
+  subsets: ["latin"],
+  weight: ["500", "600"],
+});
+
+const APP_NAME = "Bancada";
 
 export const metadata: Metadata = {
   title: {
@@ -54,8 +65,8 @@ export const viewport: Viewport = {
   // e a interface já usa alvos de toque adequados.
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f4f7f8" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#f2f1ec" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d0f10" },
   ],
 };
 
@@ -66,12 +77,14 @@ export default function RootLayout({
     <html
       lang="pt-BR"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${fonteTitulo.variable} ${fonteTexto.variable} ${fonteDados.variable} h-full antialiased`}
     >
       <body className="bg-background text-foreground flex min-h-full flex-col">
-        <StartupLoader />
-        {children}
-        <Toaster richColors closeButton position="top-center" />
+        <ThemeProvider>
+          <StartupLoader />
+          {children}
+          <Toaster richColors closeButton position="top-center" />
+        </ThemeProvider>
       </body>
     </html>
   );
