@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 
 import {
@@ -13,6 +14,10 @@ import {
   cadastrarPecaComUnidades,
 } from "@/server/services/product.service";
 import { registrarMovimento } from "@/server/services/movement.service";
+import {
+  atualizarPrecoDeReferencia,
+  marcarPendentes,
+} from "@/server/services/reference-price";
 
 import { runAction, type ActionResult } from "./run-action";
 
@@ -71,6 +76,12 @@ export async function cadastrarPeca(
   );
 
   if (resultado.ok) {
+    // Preço de mercado em segundo plano: o cadastro responde na hora e a
+    // lista mostra "buscando…" até o worker terminar.
+    const { productId } = resultado.data;
+    await marcarPendentes([productId]);
+    after(() => atualizarPrecoDeReferencia(productId));
+
     revalidatePath("/estoque/itens");
     revalidatePath("/dashboard");
     revalidatePath("/socios");

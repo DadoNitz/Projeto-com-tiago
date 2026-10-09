@@ -6,6 +6,7 @@ import { StatCard } from "@/components/shared/stat-card";
 import { can } from "@/lib/auth/permissions";
 import { formatarMoeda, formatarNumero, paraNumero } from "@/lib/format";
 import { linkDaPagina } from "@/lib/paginacao";
+import { estaBuscando } from "@/lib/preco-de-mercado";
 import { filtroEstoqueSchema } from "@/lib/validation/inventory";
 import {
   listarMarcas,
@@ -14,11 +15,18 @@ import {
 } from "@/server/services/catalog.service";
 import { listarUnidades } from "@/server/services/inventory.service";
 import { requireContext } from "@/server/session";
+import {
+  AtualizarEnquantoBusca,
+  BotaoAtualizarPrecosDoEstoque,
+} from "@/components/inventory/preco-de-mercado";
 import { Filtros } from "./filtros";
 import { ListaEstoque } from "./lista-estoque";
 
 export const metadata: Metadata = { title: "Estoque" };
 export const dynamic = "force-dynamic";
+// O botão "Preços de mercado" dispara o worker por `after()`, que herda o
+// prazo desta rota. Trinta e poucos modelos com pausa entre eles cabem aqui.
+export const maxDuration = 300;
 type SearchParams = Record<string, string | string[] | undefined>;
 
 function lerFiltro(searchParams: SearchParams) {
@@ -58,7 +66,17 @@ export default async function EstoquePage({
     quantidade: unidade.quantity,
     custo: paraNumero(unidade.purchaseCost),
     valor: paraNumero(unidade.estimatedSalePrice),
+    referencia: {
+      valor: paraNumero(unidade.product.referencePrice),
+      tipo: unidade.product.referencePriceKind,
+      status: unidade.product.referencePriceStatus,
+    },
+    buscandoPreco: estaBuscando(
+      unidade.product.referencePriceStatus,
+      unidade.product.referencePriceAt,
+    ),
   }));
+  const algumBuscando = itens.some((item) => item.buscandoPreco);
   const valorPagina = itens.reduce(
     (soma, item) => soma + (item.valor ?? 0) * item.quantidade,
     0,
@@ -67,6 +85,7 @@ export default async function EstoquePage({
   const podeEditar = can(ctx.role, "inventory:write");
   return (
     <div className="mx-auto max-w-7xl space-y-5">
+      <AtualizarEnquantoBusca ativo={algumBuscando} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-primary mb-1 text-xs font-semibold tracking-widest uppercase">
@@ -79,7 +98,8 @@ export default async function EstoquePage({
             Peças, valores e ações em um só lugar.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {podeEditar && <BotaoAtualizarPrecosDoEstoque />}
           <Link
             href="/estoque/movimentacoes"
             className={buttonVariants({ variant: "outline" })}

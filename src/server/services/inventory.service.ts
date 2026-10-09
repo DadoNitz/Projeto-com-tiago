@@ -35,6 +35,10 @@ const SELECAO_DA_LISTA = {
       name: true,
       model: true,
       trackingMode: true,
+      referencePrice: true,
+      referencePriceKind: true,
+      referencePriceStatus: true,
+      referencePriceAt: true,
       category: { select: { id: true, slug: true, name: true, icon: true } },
       brand: { select: { id: true, name: true } },
       images: {

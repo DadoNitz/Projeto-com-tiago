@@ -16,6 +16,9 @@ import { FormularioDeCadastro } from "./formulario";
 
 export const metadata: Metadata = { title: "Adicionar peça" };
 export const dynamic = "force-dynamic";
+// O cadastro dispara a busca de preço de mercado por `after()`, que herda o
+// prazo desta rota.
+export const maxDuration = 60;
 
 export default async function NovaPecaPage() {
   const ctx = await requireContext();

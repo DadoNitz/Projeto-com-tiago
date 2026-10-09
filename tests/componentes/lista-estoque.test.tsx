@@ -25,6 +25,10 @@ vi.mock("@/server/actions/edit.actions", () => ({
   removerUnidade: vi.fn(),
   salvarResumoUnidade: vi.fn(),
 }));
+vi.mock("@/server/actions/reference-price.actions", () => ({
+  atualizarPrecosDeMercadoDoEstoque: vi.fn(),
+  buscarPrecoDeMercadoDaPeca: vi.fn(),
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
 const item: ItemEstoque = {
   id: "peca-1",
@@ -38,12 +42,36 @@ const item: ItemEstoque = {
   quantidade: 1,
   custo: 80,
   valor: 125,
+  referencia: { valor: 110, tipo: "USADO", status: "OK" },
+  buscandoPreco: false,
 };
 afterEach(cleanup);
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(salvarResumoUnidade).mockResolvedValue({ ok: true, data: null });
   vi.mocked(removerUnidade).mockResolvedValue({ ok: true, data: null });
+});
+
+describe("valores na lista de estoque", () => {
+  it("mostra o custo cadastrado e o preço de mercado como estimativa", () => {
+    render(<ListaEstoque itens={[item]} podeEditar podeExcluir />);
+    expect(screen.getByText(/80,00/)).toBeTruthy();
+    const mercado = screen.getByTitle(/estimativa buscada na internet/i);
+    expect(mercado.textContent).toContain("110,00");
+    expect(mercado.textContent).toContain("usado");
+  });
+
+  it("avisa quando o custo não foi informado e quando a busca está rodando", () => {
+    render(
+      <ListaEstoque
+        itens={[{ ...item, custo: null, buscandoPreco: true }]}
+        podeEditar
+        podeExcluir
+      />,
+    );
+    expect(screen.getByText("não informado")).toBeTruthy();
+    expect(screen.getByText(/buscando preço de mercado/i)).toBeTruthy();
+  });
 });
 
 describe("ações da lista de estoque", () => {

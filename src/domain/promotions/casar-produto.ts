@@ -106,7 +106,7 @@ export function tokens(texto: string): string[] {
 }
 
 /** Tokens que carregam número: modelo, capacidade, geração. */
-function tokensDeModelo(lista: string[]): string[] {
+export function tokensDeModelo(lista: string[]): string[] {
   return lista.filter((t) => /\d/.test(t));
 }
 

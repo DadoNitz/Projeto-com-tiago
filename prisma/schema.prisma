@@ -195,6 +195,21 @@ model Product {
   /// dispara o alerta de "estoque baixo" do dashboard
   lowStockThreshold  Int      @default(0)
 
+  /// Preço de mercado de referência, buscado na internet por um worker.
+  ///
+  /// Mora no modelo, e não na unidade: duas RX 580 iguais têm o mesmo preço de
+  /// mercado, e buscar uma vez por modelo poupa consulta às fontes. Nunca
+  /// substitui o valor digitado — é uma estimativa exibida ao lado dele.
+  referencePrice       Decimal?  @db.Decimal(12, 2)
+  /// "USADO" quando veio de anúncios de usado; "NOVO" quando só havia loja.
+  referencePriceKind   String?
+  /// PENDING | OK | NOT_FOUND | FAILED
+  referencePriceStatus String?
+  referencePriceAt     DateTime?
+  /// Anúncios que entraram na conta (fonte, título, preço, link) e as fontes
+  /// que falharam, para conferir de onde o número saiu.
+  referencePriceData   Json?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?

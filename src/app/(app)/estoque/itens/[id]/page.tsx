@@ -7,10 +7,21 @@ import { FotosDaPeca } from "@/components/inventory/fotos";
 import { GerarAnuncio } from "@/components/inventory/gerar-anuncio";
 import { AdicionarUnidades } from "@/components/inventory/adicionar-unidades";
 import { MovimentarUnidade } from "@/components/inventory/movimentar";
+import {
+  AtualizarEnquantoBusca,
+  BotaoBuscarPrecoDaPeca,
+  PrecoDeMercado,
+} from "@/components/inventory/preco-de-mercado";
 import { Icone } from "@/components/layout/icon";
 import { ConditionBadge, StatusBadge } from "@/components/shared/status-badge";
 import { conteudoQrCode } from "@/domain/inventory/serial";
-import { formatarData, formatarDataHora, formatarMoeda } from "@/lib/format";
+import {
+  formatarData,
+  formatarDataHora,
+  formatarMoeda,
+  paraNumero,
+} from "@/lib/format";
+import { estaBuscando } from "@/lib/preco-de-mercado";
 import {
   MOVIMENTO_DE_SAIDA,
   ROTULO_MOVIMENTO,
@@ -25,6 +36,7 @@ import { requireContext } from "@/server/session";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function generateMetadata({
   params,
@@ -80,6 +92,24 @@ export default async function UnidadePage({
   const specs = Object.entries(
     (unidade.product.specs ?? {}) as Record<string, unknown>,
   );
+  const referencia = {
+    valor: paraNumero(unidade.product.referencePrice),
+    tipo: unidade.product.referencePriceKind,
+    status: unidade.product.referencePriceStatus,
+  };
+  const buscandoPreco = estaBuscando(
+    unidade.product.referencePriceStatus,
+    unidade.product.referencePriceAt,
+  );
+  const dadosDaReferencia = unidade.product.referencePriceData as {
+    consulta?: string;
+    rigor?: "estrito" | "aproximado" | null;
+    resumo?: { amostras: number; minimo: number; maximo: number } | null;
+    anuncios?: { fonte: string; titulo: string; preco: number; url: string }[];
+    falhas?: { fonte: string; motivo: string }[];
+  } | null;
+  const podeEditarPeca = can(ctx.role, "inventory:write");
+
   const margem =
     unidade.estimatedSalePrice && unidade.purchaseCost
       ? Number(unidade.estimatedSalePrice) - Number(unidade.purchaseCost)
@@ -263,6 +293,21 @@ export default async function UnidadePage({
             <Linha rotulo="Valor estimado de venda">
               {formatarMoeda(unidade.estimatedSalePrice)}
             </Linha>
+            <Linha rotulo="Preço de mercado">
+              {referencia.valor === null &&
+              !buscandoPreco &&
+              referencia.status === null ? (
+                <span className="text-muted-foreground opacity-60">
+                  Ainda não buscado
+                </span>
+              ) : (
+                <PrecoDeMercado
+                  referencia={referencia}
+                  buscando={buscandoPreco}
+                  className="text-sm"
+                />
+              )}
+            </Linha>
             {margem !== null ? (
               <Linha rotulo="Margem estimada">
                 <span
@@ -292,6 +337,81 @@ export default async function UnidadePage({
           </dl>
         </section>
       </div>
+
+      <AtualizarEnquantoBusca ativo={buscandoPreco} />
+      <section className="bg-card rounded-lg border">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
+          <h2 className="text-sm font-medium">
+            Preço de mercado
+            <span className="text-muted-foreground ml-2 text-xs font-normal">
+              estimativa buscada na internet, por modelo
+            </span>
+          </h2>
+          {podeEditarPeca ? <BotaoBuscarPrecoDaPeca unitId={unidade.id} /> : null}
+        </div>
+        <div className="space-y-3 p-4 text-sm">
+          {buscandoPreco ? (
+            <PrecoDeMercado referencia={referencia} buscando />
+          ) : referencia.valor !== null && dadosDaReferencia?.resumo ? (
+            <p className="text-muted-foreground opacity-70">
+              Média de {dadosDaReferencia.resumo.amostras}{" "}
+              {dadosDaReferencia.resumo.amostras === 1 ? "anúncio" : "anúncios"}{" "}
+              {referencia.tipo === "USADO" ? "de peça usada" : "de loja (peça nova)"}
+              , de {formatarMoeda(dadosDaReferencia.resumo.minimo)} a{" "}
+              {formatarMoeda(dadosDaReferencia.resumo.maximo)}
+              {dadosDaReferencia.rigor === "aproximado"
+                ? " · modelo aproximado, confira os anúncios"
+                : ""}
+              {unidade.product.referencePriceAt
+                ? ` · buscado em ${formatarDataHora(unidade.product.referencePriceAt)}`
+                : ""}
+              .
+            </p>
+          ) : (
+            <p className="text-muted-foreground opacity-70">
+              {referencia.status === "NOT_FOUND"
+                ? `Nenhum anúncio parecido com “${dadosDaReferencia?.consulta ?? unidade.product.name}”.`
+                : referencia.status === "FAILED"
+                  ? "As fontes de preço não responderam na última busca."
+                  : "Ainda não foi buscado."}
+            </p>
+          )}
+          {dadosDaReferencia?.anuncios && dadosDaReferencia.anuncios.length > 0 ? (
+            <ul className="divide-y rounded-md border opacity-80">
+              {dadosDaReferencia.anuncios.map((anuncio) => (
+                <li
+                  key={anuncio.url + anuncio.preco}
+                  className="flex items-baseline justify-between gap-3 px-3 py-2"
+                >
+                  <a
+                    href={anuncio.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-w-0 truncate hover:underline"
+                    title={anuncio.titulo}
+                  >
+                    <span className="text-muted-foreground text-xs">
+                      {anuncio.fonte} ·{" "}
+                    </span>
+                    {anuncio.titulo}
+                  </a>
+                  <span className="shrink-0 tabular-nums">
+                    {formatarMoeda(anuncio.preco)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {dadosDaReferencia?.falhas && dadosDaReferencia.falhas.length > 0 ? (
+            <p className="text-muted-foreground text-xs opacity-60">
+              Não consultado:{" "}
+              {dadosDaReferencia.falhas
+                .map((falha) => `${falha.fonte} (${falha.motivo})`)
+                .join(" · ")}
+            </p>
+          ) : null}
+        </div>
+      </section>
 
       {specs.length > 0 ? (
         <section className="bg-card rounded-lg border">

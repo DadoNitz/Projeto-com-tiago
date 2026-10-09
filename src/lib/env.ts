@@ -58,6 +58,13 @@ const serverEnvSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
+
+  /**
+   * Aplicativo do Mercado Livre (developers.mercadolivre.com.br), usado para
+   * buscar preço de peça usada. Sem ele, o preço de mercado usa só lojas.
+   */
+  ML_CLIENT_ID: z.string().optional(),
+  ML_CLIENT_SECRET: z.string().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema> & {

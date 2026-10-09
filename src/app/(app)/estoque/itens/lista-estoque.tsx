@@ -32,10 +32,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PrecoDeMercado } from "@/components/inventory/preco-de-mercado";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { UnitCondition, UnitStatus } from "@/generated/prisma/enums";
 import { formatarMoeda } from "@/lib/format";
+import type { ReferenciaDeMercado } from "@/lib/preco-de-mercado";
 import {
   CONDICOES_SELECIONAVEIS,
   ROTULO_CONDICAO,
@@ -57,6 +59,8 @@ export interface ItemEstoque {
   quantidade: number;
   custo: number | null;
   valor: number | null;
+  referencia: ReferenciaDeMercado;
+  buscandoPreco: boolean;
 }
 
 export function ListaEstoque({
@@ -79,12 +83,12 @@ export function ListaEstoque({
   return (
     <>
       <div
-        className="hidden grid-cols-[minmax(0,1fr)_150px_140px_144px] gap-4 px-5 pb-3 text-xs font-medium text-muted-foreground lg:grid"
+        className="hidden grid-cols-[minmax(0,1fr)_150px_170px_144px] gap-4 px-5 pb-3 text-xs font-medium text-muted-foreground lg:grid"
         aria-hidden
       >
         <span>PEÇA / LOCAL</span>
         <span>SITUAÇÃO</span>
-        <span className="text-right">VALOR DE VENDA</span>
+        <span className="text-right">VALORES</span>
         <span className="text-right">AÇÕES</span>
       </div>
       <ul className="space-y-3 lg:space-y-2" aria-label="Peças do estoque">
@@ -125,7 +129,7 @@ export function ListaEstoque({
             <li key={item.id}>
               <ContextMenu.Root>
                 <ContextMenu.Trigger className="inventory-item bg-card rounded-2xl border p-4 transition-colors hover:border-primary/35 lg:px-5">
-                  <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 lg:grid-cols-[minmax(0,1fr)_150px_140px_144px] lg:gap-4">
+                  <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 lg:grid-cols-[minmax(0,1fr)_150px_170px_144px] lg:gap-4">
                     <Link
                       href={href}
                       className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:ring-2 focus-visible:ring-ring"
@@ -181,11 +185,24 @@ export function ListaEstoque({
                           {formatarMoeda(item.valor)}
                         </span>
                       )}
-                      <span className="text-muted-foreground block text-[11px]">
-                        {item.quantidade}{" "}
-                        {item.quantidade === 1 ? "unidade" : "unidades"} · valor
-                        unitário
+                      <span className="text-muted-foreground block text-[11px] tabular-nums">
+                        Custo{" "}
+                        {item.custo === null ? (
+                          <span className="italic">não informado</span>
+                        ) : (
+                          <span className="text-foreground font-medium">
+                            {formatarMoeda(item.custo)}
+                          </span>
+                        )}
+                        {item.quantidade > 1
+                          ? ` · ${item.quantidade} unidades`
+                          : ""}
                       </span>
+                      <PrecoDeMercado
+                        referencia={item.referencia}
+                        buscando={item.buscandoPreco}
+                        className="mt-0.5 lg:justify-end"
+                      />
                     </div>
                     <div className="col-start-2 row-start-3 flex items-center justify-end self-stretch border-t pt-3 lg:col-start-4 lg:row-start-1 lg:border-0 lg:pt-0">
                       {editavel && (
