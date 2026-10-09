@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Icone } from "@/components/layout/icon";
+import { CountUp } from "@/components/motion/count-up";
 import { StatCard } from "@/components/shared/stat-card";
 import { buttonVariants } from "@/components/ui/button";
 import { ConditionBadge, StatusBadge } from "@/components/shared/status-badge";
@@ -37,15 +38,10 @@ export default async function DashboardPage() {
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-primary mb-1 text-xs font-semibold tracking-widest uppercase">
-            Visão geral
+          <p className="text-muted-foreground mb-1 font-mono text-xs">
+            {formatarData(new Date())}
           </p>
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-            Tudo sob controle
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Visão geral do estoque em tempo real.
-          </p>
+          <h1 className="text-3xl sm:text-4xl">Visão geral</h1>
         </div>
         <Link
           href="/estoque/ler"
@@ -56,6 +52,54 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
+      {/* Cartão principal: o número que importa, invertido no tema escuro. */}
+      <section
+        aria-label="Resumo do estoque"
+        className="bg-hero text-hero-foreground flex flex-col gap-4 rounded-[28px] p-5 sm:p-6"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-hero-muted text-sm font-medium">
+            Disponível agora
+          </p>
+          <p className="text-hero-muted font-mono text-xs">
+            {formatarNumero(resumo.unidades)} unidades no total
+          </p>
+        </div>
+        <div className="flex items-baseline gap-3">
+          <CountUp
+            valor={resumo.disponiveis}
+            className="font-heading text-hero-number text-[76px] leading-[0.85] font-extrabold tracking-[-0.05em] sm:text-[96px]"
+          />
+          <span className="text-lg font-medium">peças</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <Link
+            href="/estoque/itens?status=RESERVED"
+            className="bg-hero-tile rounded-2xl px-3 py-2.5 transition-transform active:scale-[0.97]"
+          >
+            <span className="block font-mono text-lg font-semibold">
+              {formatarNumero(resumo.reservados)}
+            </span>
+            <span className="text-hero-muted text-xs">reservadas</span>
+          </Link>
+          <Link
+            href="/estoque/itens?status=DEFECTIVE"
+            className="bg-hero-tile rounded-2xl px-3 py-2.5 transition-transform active:scale-[0.97]"
+          >
+            <span className="block font-mono text-lg font-semibold">
+              {formatarNumero(resumo.comDefeito)}
+            </span>
+            <span className="text-hero-muted text-xs">com defeito</span>
+          </Link>
+          <div className="bg-hero-tile rounded-2xl px-3 py-2.5">
+            <span className="block truncate font-mono text-lg font-semibold">
+              {formatarMoeda(margem)}
+            </span>
+            <span className="text-hero-muted text-xs">margem est.</span>
+          </div>
+        </div>
+      </section>
+
       <section
         aria-label="Indicadores"
         className="grid grid-cols-2 gap-3 lg:grid-cols-4"
@@ -63,6 +107,7 @@ export default async function DashboardPage() {
         <StatCard
           titulo="Itens disponíveis"
           valor={formatarNumero(resumo.disponiveis)}
+          numero={resumo.disponiveis}
           detalhe={`${formatarNumero(resumo.unidades)} unidades no total`}
           icone="Package"
           href="/estoque/itens?status=AVAILABLE"
@@ -86,6 +131,8 @@ export default async function DashboardPage() {
         <StatCard
           titulo="Valor do estoque"
           valor={formatarMoeda(resumo.valorEstimado)}
+          numero={resumo.valorEstimado}
+          formato="moeda"
           detalhe={`custo ${formatarMoeda(resumo.custoTotal)} · margem ${formatarMoeda(margem)}`}
           icone="FileBarChart"
         />
@@ -94,7 +141,7 @@ export default async function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <section
           aria-label="Estoque por categoria"
-          className="bg-card rounded-lg border lg:col-span-2"
+          className="bg-card rounded-3xl border lg:col-span-2"
         >
           <header className="flex items-center justify-between border-b px-4 py-3">
             <h2 className="text-sm font-medium">Estoque por categoria</h2>
@@ -153,7 +200,7 @@ export default async function DashboardPage() {
                         </div>
                         <div className="bg-muted mt-1.5 h-1.5 overflow-hidden rounded-full">
                           <div
-                            className="bg-primary h-full rounded-full"
+                            className="bg-foreground h-full rounded-full"
                             style={{ width: `${proporcao}%` }}
                           />
                         </div>
@@ -167,7 +214,7 @@ export default async function DashboardPage() {
         </section>
 
         <div className="space-y-4">
-          <section aria-label="Alertas" className="bg-card rounded-lg border">
+          <section aria-label="Alertas" className="bg-card rounded-3xl border">
             <header className="border-b px-4 py-3">
               <h2 className="text-sm font-medium">Alertas</h2>
             </header>
@@ -181,7 +228,7 @@ export default async function DashboardPage() {
                 {estoqueBaixo.map((alerta) => (
                   <li key={alerta.productId} className="flex gap-3 px-4 py-3">
                     <AlertTriangle
-                      className="mt-0.5 size-4 shrink-0 text-amber-600"
+                      className="mt-0.5 size-4 shrink-0 text-st-hold"
                       aria-hidden
                     />
                     <div className="min-w-0">

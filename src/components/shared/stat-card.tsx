@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Icone } from "@/components/layout/icon";
+import { CountUp } from "@/components/motion/count-up";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,6 +13,8 @@ import { cn } from "@/lib/utils";
 export function StatCard({
   titulo,
   valor,
+  numero,
+  formato,
   detalhe,
   icone,
   href,
@@ -19,6 +22,9 @@ export function StatCard({
 }: {
   titulo: string;
   valor: string;
+  /** Quando informado, o número conta até o valor ao abrir a tela. */
+  numero?: number;
+  formato?: "numero" | "moeda";
   detalhe?: string;
   icone: string;
   href?: string;
@@ -31,17 +37,21 @@ export function StatCard({
         <Icone
           nome={icone}
           className={cn(
-            "size-8 shrink-0 rounded-lg bg-muted/70 p-1.5",
+            "size-9 shrink-0 rounded-xl p-2",
             destaque === "atencao"
-              ? "text-amber-600"
+              ? "bg-st-hold-soft text-st-hold"
               : destaque === "positivo"
-                ? "text-emerald-600"
-                : "text-muted-foreground",
+                ? "bg-st-ok-soft text-st-ok"
+                : "bg-muted text-muted-foreground",
           )}
         />
       </div>
-      <p className="mt-2 text-xl font-semibold tracking-tight tabular-nums break-words sm:text-2xl">
-        {valor}
+      <p className="mt-2 font-mono text-xl font-semibold tracking-tight tabular-nums break-words sm:text-2xl">
+        {numero !== undefined ? (
+          <CountUp valor={numero} formato={formato} />
+        ) : (
+          valor
+        )}
       </p>
       {detalhe ? (
         <p className="text-muted-foreground mt-1 text-xs">{detalhe}</p>
@@ -50,8 +60,9 @@ export function StatCard({
   );
 
   const classe = cn(
-    "bg-card min-w-0 h-full rounded-2xl border p-4",
-    href && "hover:border-primary/40 transition-colors",
+    "bg-card min-w-0 h-full rounded-3xl border p-4",
+    href &&
+      "hover:border-foreground/25 transition-all duration-200 active:scale-[0.98]",
   );
 
   if (href) {

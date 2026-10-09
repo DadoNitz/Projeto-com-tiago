@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { Icone } from "@/components/layout/icon";
+import { BrandMark } from "@/components/layout/brand";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -63,15 +64,13 @@ export function Topbar({ nome, role }: { nome: string; role: Role }) {
   }
 
   return (
-    <header className="bg-card/95 sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b px-4 py-2 backdrop-blur sm:gap-3 sm:px-6">
+    <header className="bg-background/85 sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b px-4 py-2 backdrop-blur-xl sm:gap-3 sm:px-6">
       <Link
         href="/dashboard"
         aria-label="Ir para o início"
         className="flex size-11 shrink-0 items-center justify-center lg:hidden"
       >
-        <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
-          <Icone nome="CircuitBoard" className="size-5" />
-        </div>
+        <BrandMark className="size-10" />
       </Link>
 
       <form onSubmit={buscar} className="min-w-0 max-w-lg flex-1" role="search">
@@ -86,10 +85,12 @@ export function Topbar({ nome, role }: { nome: string; role: Role }) {
             onChange={(evento) => setTermo(evento.target.value)}
             placeholder="Buscar peça, serial, código…"
             aria-label="Buscar no estoque"
-            className="h-11 bg-muted/50 pl-9"
+            className="bg-card h-11 rounded-2xl pl-9"
           />
         </div>
       </form>
+
+      <ThemeToggle className="ml-auto" />
 
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -97,12 +98,12 @@ export function Topbar({ nome, role }: { nome: string; role: Role }) {
             <Button
               variant="ghost"
               size="icon"
-              className="ml-auto size-11 shrink-0 rounded-full"
+              className="size-11 shrink-0 rounded-2xl"
               aria-label="Menu do usuário"
             />
           }
         >
-          <span className="bg-muted flex size-8 items-center justify-center rounded-full text-xs font-medium">
+          <span className="bg-muted font-heading flex size-9 items-center justify-center rounded-xl text-sm font-extrabold">
             {iniciais || "?"}
           </span>
         </DropdownMenuTrigger>

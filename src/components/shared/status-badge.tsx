@@ -22,11 +22,12 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap",
         COR_STATUS[status],
         className,
       )}
     >
+      <span aria-hidden className="size-1.5 rounded-full bg-current" />
       {ROTULO_STATUS[status]}
     </span>
   );

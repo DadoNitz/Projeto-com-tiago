@@ -168,6 +168,6 @@ export const NAVEGACAO_MOBILE: ItemDeNavegacao[] = [
     permissao: "inventory:write",
     disponivel: true,
   },
-  { titulo: "Sócios", href: "/socios", icone: "Users", disponivel: true },
+  { titulo: "Montagens", href: "/montagens", icone: "Cpu", disponivel: true },
   { titulo: "Mais", href: "/mais", icone: "Menu", disponivel: true },
 ];

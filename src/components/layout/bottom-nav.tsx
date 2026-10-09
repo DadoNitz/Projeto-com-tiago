@@ -29,11 +29,11 @@ export function BottomNav({ role }: { role: Role }) {
   return (
     <nav
       aria-label="Navegação"
-      className="bg-card/95 fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur lg:hidden"
+      className="bg-card/90 fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur-xl lg:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <ul
-        className="grid"
+        className="grid px-2"
         style={{
           gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))`,
         }}
@@ -45,19 +45,25 @@ export function BottomNav({ role }: { role: Role }) {
               : pathname.startsWith(item.href);
           const destaque = item.icone === "Plus";
 
-          const conteudo = (
+          // O "+" sobe acima da barra: é a ação mais frequente e precisa ser
+          // achada sem olhar. Os outros itens marcam a tela atual com a
+          // pílula verde LED atrás do ícone.
+          const conteudo = destaque ? (
+            <>
+              <span className="bg-primary text-primary-foreground -mt-7 flex size-14 items-center justify-center rounded-[20px] shadow-[0_10px_24px_-6px_rgba(0,0,0,0.35)] transition-transform duration-200 ease-[var(--ease-spring)] group-active:scale-90">
+                <Icone nome={item.icone} className="size-7" />
+              </span>
+              <span className="sr-only">{item.titulo}</span>
+            </>
+          ) : (
             <>
               <span
                 className={cn(
-                  "flex items-center justify-center",
-                  destaque &&
-                    "bg-primary text-primary-foreground size-11 rounded-2xl",
+                  "flex h-8 w-14 items-center justify-center rounded-full transition-all duration-300 ease-[var(--ease-spring)] group-active:scale-90",
+                  ativo ? "bg-led text-led-foreground" : "bg-transparent",
                 )}
               >
-                <Icone
-                  nome={item.icone}
-                  className={destaque ? "size-6" : "size-5"}
-                />
+                <Icone nome={item.icone} className="size-5" />
               </span>
               <span className="text-[11px] leading-none">{item.titulo}</span>
             </>
@@ -78,14 +84,14 @@ export function BottomNav({ role }: { role: Role }) {
           }
 
           return (
-            <li key={item.href}>
+            <li key={item.href} className="flex justify-center">
               <Link
                 href={item.href}
                 aria-current={ativo ? "page" : undefined}
                 className={cn(
-                  "flex min-h-16 flex-col items-center justify-center gap-1 transition-colors",
+                  "group flex min-h-16 w-full flex-col items-center justify-center gap-1 transition-colors",
                   ativo
-                    ? "text-primary font-semibold"
+                    ? "text-foreground font-semibold"
                     : "text-muted-foreground",
                 )}
               >
