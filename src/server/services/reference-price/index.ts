@@ -28,17 +28,24 @@ import { FONTES, type Anuncio, type Condicao } from "./fontes";
 
 export type StatusDaReferencia = "PENDING" | "OK" | "NOT_FOUND" | "FAILED";
 
-/** O que fica salvo em `referencePriceData`, para conferir a origem do número. */
+/**
+ * O que fica salvo em `referencePriceData`, para conferir a origem do número.
+ * O formato é o mesmo que a tela lê (`DadosDoPrecoDeMercado`).
+ */
 export interface DadosDaReferencia {
   consulta: string;
   rigor: Rigor | null;
+  condicao: Condicao | null;
   resumo: ResumoDePrecos | null;
-  anuncios: Anuncio[];
+  /** Anúncios que as fontes devolveram, antes do filtro de mesma peça. */
+  encontrados: number;
+  /** Anúncios da mesma peça, do mais barato ao mais caro. */
+  anuncios: (Anuncio & { entrou: boolean })[];
   falhas: { fonte: string; motivo: string }[];
 }
 
-/** Quantos anúncios guardar como prova. O resto só entra na conta. */
-const ANUNCIOS_GUARDADOS = 10;
+/** Quantos anúncios guardar como prova — todos os que costumam aparecer. */
+const ANUNCIOS_GUARDADOS = 40;
 
 /** Mínimo de anúncios de usado para preferir o usado à loja. */
 const MINIMO_DE_USADOS = 2;
@@ -142,14 +149,24 @@ export async function atualizarPrecoDeReferencia(
       ? "NOT_FOUND"
       : "FAILED";
 
+  // Entrou na média quem ficou dentro da faixa que sobrou depois de tirar os
+  // extremos (a faixa é contínua: os preços são ordenados antes do corte).
+  const entrou = (preco: number) =>
+    calculado !== null &&
+    preco >= calculado.minimo &&
+    preco <= calculado.maximo;
+
   const dados: DadosDaReferencia = {
     consulta,
     rigor: escolha?.rigor ?? null,
+    condicao: escolha?.condicao ?? null,
     resumo,
+    encontrados: porCondicao.USADO.length + porCondicao.NOVO.length,
     anuncios: (escolha?.anuncios ?? [])
       .slice()
       .sort((a, b) => a.preco - b.preco)
-      .slice(0, ANUNCIOS_GUARDADOS),
+      .slice(0, ANUNCIOS_GUARDADOS)
+      .map((anuncio) => ({ ...anuncio, entrou: entrou(anuncio.preco) })),
     falhas,
   };
 

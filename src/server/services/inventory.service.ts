@@ -39,6 +39,7 @@ const SELECAO_DA_LISTA = {
       referencePriceKind: true,
       referencePriceStatus: true,
       referencePriceAt: true,
+      referencePriceData: true,
       category: { select: { id: true, slug: true, name: true, icon: true } },
       brand: { select: { id: true, name: true } },
       images: {

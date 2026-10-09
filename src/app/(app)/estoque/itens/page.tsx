@@ -6,7 +6,7 @@ import { StatCard } from "@/components/shared/stat-card";
 import { can } from "@/lib/auth/permissions";
 import { formatarMoeda, formatarNumero, paraNumero } from "@/lib/format";
 import { linkDaPagina } from "@/lib/paginacao";
-import { estaBuscando } from "@/lib/preco-de-mercado";
+import { estaBuscando, lerDadosDoPreco } from "@/lib/preco-de-mercado";
 import { filtroEstoqueSchema } from "@/lib/validation/inventory";
 import {
   listarMarcas,
@@ -70,6 +70,8 @@ export default async function EstoquePage({
       valor: paraNumero(unidade.product.referencePrice),
       tipo: unidade.product.referencePriceKind,
       status: unidade.product.referencePriceStatus,
+      em: unidade.product.referencePriceAt?.toISOString() ?? null,
+      dados: lerDadosDoPreco(unidade.product.referencePriceData),
     },
     buscandoPreco: estaBuscando(
       unidade.product.referencePriceStatus,

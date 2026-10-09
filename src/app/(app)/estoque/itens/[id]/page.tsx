@@ -21,7 +21,7 @@ import {
   formatarMoeda,
   paraNumero,
 } from "@/lib/format";
-import { estaBuscando } from "@/lib/preco-de-mercado";
+import { estaBuscando, lerDadosDoPreco } from "@/lib/preco-de-mercado";
 import {
   MOVIMENTO_DE_SAIDA,
   ROTULO_MOVIMENTO,
@@ -96,6 +96,8 @@ export default async function UnidadePage({
     valor: paraNumero(unidade.product.referencePrice),
     tipo: unidade.product.referencePriceKind,
     status: unidade.product.referencePriceStatus,
+    em: unidade.product.referencePriceAt?.toISOString() ?? null,
+    dados: lerDadosDoPreco(unidade.product.referencePriceData),
   };
   const buscandoPreco = estaBuscando(
     unidade.product.referencePriceStatus,

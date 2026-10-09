@@ -42,7 +42,26 @@ const item: ItemEstoque = {
   quantidade: 1,
   custo: 80,
   valor: 125,
-  referencia: { valor: 110, tipo: "USADO", status: "OK" },
+  referencia: {
+    valor: 110,
+    tipo: "USADO",
+    status: "OK",
+    em: "2026-10-09T19:00:00.000Z",
+    dados: {
+      consulta: "kingston ddr4",
+      rigor: "estrito",
+      condicao: "USADO",
+      encontrados: 12,
+      resumo: { media: 110, mediana: 110, minimo: 100, maximo: 120, amostras: 3 },
+      anuncios: [
+        { fonte: "Mercado Livre", titulo: "Kingston DDR4 8GB", preco: 15, url: "https://x/1", entrou: false },
+        { fonte: "Mercado Livre", titulo: "Kingston DDR4 8GB usada", preco: 100, url: "https://x/2", entrou: true },
+        { fonte: "Buscapé", titulo: "Memória Kingston DDR4", preco: 110, url: "https://x/3", entrou: true },
+        { fonte: "Buscapé", titulo: "Kingston Fury DDR4", preco: 120, url: "https://x/4", entrou: true },
+      ],
+      falhas: [],
+    },
+  },
   buscandoPreco: false,
 };
 afterEach(cleanup);
@@ -59,6 +78,18 @@ describe("valores na lista de estoque", () => {
     const mercado = screen.getByTitle(/estimativa buscada na internet/i);
     expect(mercado.textContent).toContain("110,00");
     expect(mercado.textContent).toContain("usado");
+  });
+
+  it("clicar no preço de mercado mostra os anúncios e a conta", async () => {
+    const user = userEvent.setup();
+    render(<ListaEstoque itens={[item]} podeEditar podeExcluir />);
+    await user.click(
+      screen.getByRole("button", { name: /ver como o preço de mercado/i }),
+    );
+    expect(screen.getByText("Como a conta foi feita")).toBeTruthy();
+    expect(screen.getByText(/3 entraram na média/)).toBeTruthy();
+    expect(screen.getByText(/descartado \(extremo\)/)).toBeTruthy();
+    expect(screen.getByText("Kingston DDR4 8GB usada")).toBeTruthy();
   });
 
   it("avisa quando o custo não foi informado e quando a busca está rodando", () => {
@@ -79,7 +110,7 @@ describe("ações da lista de estoque", () => {
     const user = userEvent.setup();
     render(<ListaEstoque itens={[item]} podeEditar podeExcluir />);
     await user.click(
-      screen.getByRole("button", { name: "Editar valor de Memória DDR4" }),
+      screen.getByRole("button", { name: "Editar valor de venda de Memória DDR4" }),
     );
     const venda = screen.getByLabelText("Venda (R$)");
     await user.clear(venda);
